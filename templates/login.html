@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block bodyclass %}tela-login{% endblock %}
+{% block content %}
+<form method="post" class="cartao login">
+  <h1>Linha do Tempo de Provas</h1>
+  <p class="sutil">Acesso restrito.</p>
+  <label>Senha <input type="password" name="senha" autofocus required autocomplete="current-password"></label>
+  <button type="submit" class="botao">Entrar</button>
+</form>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_media.html" import media %}
+{% block content %}
+<section class="resumo">
+  <div><strong>{{ stats.n }}</strong> registros</div>
+  {% if stats.a %}<div>de <strong>{{ stats.a|fmt_dt }}</strong> a <strong>{{ stats.b|fmt_dt }}</strong></div>{% endif %}
+  <div class="sutil">{{ kinds.get('imagem', 0) }} imagens · {{ kinds.get('audio', 0) }} áudios · {{ kinds.get('video', 0) }} vídeos · {{ kinds.get('documento', 0) }} documentos</div>
+</section>
+
+<form class="filtros" method="get">
+  <input type="search" name="q" value="{{ f.q }}" placeholder="Buscar em título, descrição, origem, pessoas">
+  <label>De <input type="date" name="de" value="{{ f.de }}"></label>
+  <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
+  <select name="tipo">
+    <option value="">Todos os tipos</option>
+    {% for k, n in [('imagem','Imagens'),('audio','Áudios'),('video','Vídeos'),('documento','Documentos')] %}
+    <option value="{{ k }}" {% if f.tipo == k %}selected{% endif %}>{{ n }}</option>
+    {% endfor %}
+  </select>
+  <label class="check"><input type="checkbox" name="destaque" value="1" {% if f.destaque %}checked{% endif %}> Só destaques</label>
+  <button class="botao secundario">Filtrar</button>
+  {% if f.values()|select|list %}<a href="{{ url_for('timeline') }}">Limpar</a>{% endif %}
+  <a class="direita" href="{{ url_for('export', **request.args) }}">⬇ Baixar pacote (ZIP + manifesto)</a>
+</form>
+
+{% if not days %}
+  <div class="vazio">
+    {% if stats.n %}Nenhum registro com esses filtros.
+    {% else %}Nenhuma prova cadastrada ainda.{% if session.role == 'admin' %} <a href="{{ url_for('new') }}">Adicionar a primeira</a>.{% endif %}{% endif %}
+  </div>
+{% endif %}
+
+<div class="linha">
+{% for day, evs in days %}
+  <section class="dia">
+    <h2 class="dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }}</span></h2>
+    {% for e in evs %}
+    <article class="evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
+      <div class="hora">{{ e.occurred_at|hora }}</div>
+      <div class="corpo">
+        <header>
+          <h3>{% if e.important %}<span class="estrela" title="Destaque">★</span> {% endif %}{{ e.title }}</h3>
+          {% if session.role == 'admin' %}<a class="editar" href="{{ url_for('edit', eid=e.id) }}">Editar</a>{% endif %}
+        </header>
+        {% if e.source or e.people %}
+        <p class="meta">
+          {% if e.source %}<span>Origem: {{ e.source }}</span>{% endif %}
+          {% if e.people %}<span>Envolvidos: {{ e.people }}</span>{% endif %}
+        </p>
+        {% endif %}
+        {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
+        {% if e.files %}
+        <div class="midias">{% for fl in e.files %}{{ media(fl) }}{% endfor %}</div>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

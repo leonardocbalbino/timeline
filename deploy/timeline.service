@@ -1,0 +1,17 @@
+[Unit]
+Description=Linha do Tempo de Provas
+After=network.target
+
+[Service]
+User=timeline
+Group=timeline
+WorkingDirectory=/opt/timeline
+EnvironmentFile=/opt/timeline/.env
+ExecStart=/opt/timeline/venv/bin/gunicorn -w 2 --threads 4 -b 127.0.0.1:8410 --timeout 900 app:app
+Restart=always
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

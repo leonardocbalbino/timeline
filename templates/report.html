@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_media.html" import media %}
+{% block title %}Relatório cronológico de provas{% endblock %}
+{% block bodyclass %}relatorio{% endblock %}
+{% block content %}
+<div class="nao-imprimir barra-relatorio">
+  <button class="botao" onclick="window.print()">Imprimir / Salvar em PDF</button>
+  <span class="sutil">Áudios e vídeos aparecem como referência (nome, tamanho e hash). Os arquivos originais estão no pacote ZIP.</span>
+</div>
+<h1>Relatório cronológico de provas</h1>
+<p class="sutil">Gerado em {{ generated }} (horário de Brasília) · {{ total }} registro(s)
+  {% if f.de or f.ate %}· período {{ f.de or 'início' }} a {{ f.ate or 'fim' }}{% endif %}</p>
+
+<table class="tabela-relatorio">
+  <thead><tr><th>#</th><th>Data e hora</th><th>Registro</th></tr></thead>
+  <tbody>
+  {% set n = namespace(i=0) %}
+  {% for day, evs in days %}
+    <tr class="linha-dia"><td colspan="3">{{ (day ~ 'T00:00')|fmt_day }}</td></tr>
+    {% for e in evs %}{% set n.i = n.i + 1 %}
+    <tr>
+      <td>{{ n.i }}</td>
+      <td class="nowrap">{{ e.occurred_at|fmt_dt }}</td>
+      <td>
+        <strong>{% if e.important %}★ {% endif %}{{ e.title }}</strong>
+        {% if e.source or e.people %}<div class="meta">{% if e.source %}Origem: {{ e.source }}. {% endif %}{% if e.people %}Envolvidos: {{ e.people }}.{% endif %}</div>{% endif %}
+        {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
+        {% for fl in e.files %}{{ media(fl, report=True) }}{% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  {% endfor %}
+  </tbody>
+</table>
+<p class="sutil rodape">Cada arquivo foi identificado pelo hash SHA-256 calculado no momento em que foi enviado ao sistema.
+Qualquer alteração no arquivo, por menor que seja, muda esse código. Para conferir: <code>certutil -hashfile arquivo SHA256</code> (Windows) ou <code>sha256sum arquivo</code> (Linux/Mac).</p>
+{% endblock %}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}Linha do Tempo de Provas{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% if session.role %}
+<header class="topo">
+  <a class="marca" href="{{ url_for('timeline') }}">Linha do Tempo de Provas</a>
+  <nav>
+    <a href="{{ url_for('timeline') }}">Linha do tempo</a>
+    {% if session.role == 'admin' %}<a class="botao" href="{{ url_for('new') }}">+ Nova prova</a>{% endif %}
+    <a href="{{ url_for('report', **request.args) }}">Relatório</a>
+    <a href="{{ url_for('verify') }}">Verificar arquivo</a>
+    {% if session.role == 'admin' %}<a href="{{ url_for('audit_log') }}">Auditoria</a>{% endif %}
+    <a href="{{ url_for('logout') }}" class="sair">Sair ({{ session.role }})</a>
+  </nav>
+</header>
+{% endif %}
+<main>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<div class="aviso {{ cat }}">{{ m }}</div>{% endfor %}
+{% endwith %}
+{% block content %}{% endblock %}
+</main>
+<div id="lightbox" hidden><img alt=""><button type="button" aria-label="Fechar">×</button></div>
+<script src="{{ url_for('static', filename='app.js') }}?v=3"></script>
+</body>
+</html>

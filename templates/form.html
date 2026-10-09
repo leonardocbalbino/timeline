@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="cartao formulario" id="form-prova">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <h1>{% if editing %}Editar prova{% else %}Nova prova{% endif %}</h1>
+
+  <label class="arrastar" id="arrastar">
+    <input type="file" name="arquivos" id="arquivos" multiple
+           accept="image/*,audio/*,video/*,.opus,.ogg,.m4a,.amr,.pdf,.txt">
+    <span><strong>Clique ou arraste</strong> prints, áudios ou vídeos aqui.<br>
+    <small>Pode enviar vários arquivos do mesmo momento. Se o nome do arquivo tiver data (ex.: WhatsApp, Screenshot), ela é sugerida automaticamente.</small></span>
+  </label>
+  <ul id="lista-arquivos" class="lista-arquivos"></ul>
+
+  <div class="linha-campos">
+    <label>Data do fato <input type="date" name="data" value="{{ ev.data or '' }}" required></label>
+    <label>Hora <input type="time" name="hora" step="1" value="{{ ev.hora or '' }}"></label>
+  </div>
+  <p class="sutil" id="sugestao"></p>
+
+  <label>Título <input type="text" name="titulo" value="{{ ev.title or ev.titulo or '' }}" required maxlength="300"
+         placeholder="Ex.: Mensagem de Fulano confirmando o horário"></label>
+  <label>Descrição / o que esta prova demonstra
+    <textarea name="descricao" rows="5">{{ ev.description or ev.descricao or '' }}</textarea></label>
+  <div class="linha-campos">
+    <label>Origem <input type="text" name="origem" list="origens" value="{{ ev.source or ev.origem or '' }}"
+           placeholder="WhatsApp, Instagram, e-mail, câmera..."></label>
+    <label>Pessoas envolvidas <input type="text" name="pessoas" value="{{ ev.people or ev.pessoas or '' }}"></label>
+  </div>
+  <datalist id="origens">
+    <option>WhatsApp</option><option>Instagram</option><option>Facebook</option><option>Telegram</option>
+    <option>E-mail</option><option>SMS</option><option>Ligação gravada</option><option>Câmera de segurança</option>
+    <option>Celular (galeria)</option><option>Documento</option>
+  </datalist>
+  <label class="check"><input type="checkbox" name="destaque" value="1" {% if ev.important or ev.destaque %}checked{% endif %}> Marcar como destaque (prova importante)</label>
+
+  {% if files %}
+  <fieldset>
+    <legend>Arquivos já anexados</legend>
+    {% for fl in files %}
+    <label class="check"><input type="checkbox" name="remover" value="{{ fl.id }}"> Remover
+      <strong>{{ fl.original_name }}</strong> <small class="sutil">({{ fl.kind }}, {{ fl.size|human_size }})</small></label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+
+  <div class="progresso" id="progresso" hidden><div></div><span></span></div>
+
+  <div class="acoes">
+    <button type="submit" class="botao">Salvar</button>
+    {% if not editing %}<button type="submit" name="continuar" value="1" class="botao secundario">Salvar e adicionar outra</button>{% endif %}
+    <a href="{{ url_for('timeline') }}">Cancelar</a>
+  </div>
+</form>
+
+{% if editing %}
+<form method="post" action="{{ url_for('delete', eid=ev.id) }}" class="excluir"
+      onsubmit="return confirm('Excluir esta prova e seus arquivos? A exclusão fica registrada na auditoria.')">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <button class="botao perigo">Excluir esta prova</button>
+</form>
+{% endif %}
+{% endblock %}

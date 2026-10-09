@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Registro de auditoria</h1>
+<p class="sutil">Toda entrada, criação, edição, exclusão e download fica registrada aqui (últimos 1000 eventos).</p>
+<div class="tabela-rolagem">
+<table class="tabela-relatorio">
+  <thead><tr><th>Quando</th><th>Perfil</th><th>IP</th><th>Ação</th><th>Detalhes</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td class="nowrap">{{ r.at|fmt_dt }}</td><td>{{ r.role }}</td><td>{{ r.ip }}</td><td>{{ r.action }}</td><td class="quebra">{{ r.detail }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
