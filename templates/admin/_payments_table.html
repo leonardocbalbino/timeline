@@ -1,0 +1,34 @@
+<div class="tabela-caixa" style="box-shadow:none">
+<table class="tabela">
+  <thead><tr><th>Criada em</th>{% if show_tenant %}<th>Cliente</th>{% endif %}<th>Valor</th><th>Período</th><th>Situação</th><th>Comprovante</th><th></th></tr></thead>
+  <tbody>
+  {% for p in pays %}
+  <tr>
+    <td class="nowrap">{{ p.created_at|fmt_dt }}<br><small class="sutil">{{ p.txid }}</small></td>
+    {% if show_tenant %}<td><a href="{{ url_for('admin_client', tid=p.tenant_id) }}">{{ p.tenant_name }}</a></td>{% endif %}
+    <td class="nowrap">{{ p.amount_cents|brl }}</td>
+    <td class="nowrap">{{ p.days }} dias</td>
+    <td>{% include "_pay_status.html" %}
+      {% if p.informed_at %}<br><small class="sutil">informado {{ p.informed_at|fmt_dt }}</small>{% endif %}
+      {% if p.decided_by %}<br><small class="sutil">por {{ p.decided_by }} em {{ p.decided_at|fmt_dt }}</small>{% endif %}
+      {% if p.note %}<br><small>“{{ p.note }}”</small>{% endif %}</td>
+    <td>{% if p.receipt_stored %}<a href="{{ url_for('admin_payment_receipt', pay_id=p.id) }}" target="_blank" rel="noopener">{{ p.receipt_name }}</a>{% else %}<span class="sutil">—</span>{% endif %}</td>
+    <td class="acoes-linha">
+      {% if p.status in ('pendente', 'informado') %}
+      <form method="post" action="{{ url_for('admin_payment_decide', pay_id=p.id, acao='confirmar') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="botao sucesso mini" data-confirmar="Confirmar o recebimento de {{ p.amount_cents|brl }} e liberar {{ p.days }} dias de Pro?">Confirmar</button>
+      </form>
+      <form method="post" action="{{ url_for('admin_payment_decide', pay_id=p.id, acao='recusar') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="botao fantasma mini" data-confirmar="Recusar este pagamento?">Recusar</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="sutil">Nenhum pagamento.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

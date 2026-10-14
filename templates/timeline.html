@@ -1,13 +1,42 @@
 {% extends "base.html" %}
 {% from "_media.html" import media %}
+{% block title %}{{ proc.title }} · Linha do tempo{% endblock %}
+{% block bodyclass %}{{ 'largo' if modo == 'horizontal' }}{% endblock %}
 {% block content %}
-<section class="resumo">
-  <div><strong>{{ stats.n }}</strong> registros</div>
-  {% if stats.a %}<div>de <strong>{{ stats.a|fmt_dt }}</strong> a <strong>{{ stats.b|fmt_dt }}</strong></div>{% endif %}
-  <div class="sutil">{{ kinds.get('imagem', 0) }} imagens · {{ kinds.get('audio', 0) }} áudios · {{ kinds.get('video', 0) }} vídeos · {{ kinds.get('documento', 0) }} documentos</div>
-</section>
+{% set horizontal_ok = has_feature('timeline_horizontal') %}
+{% if share %}
+  {% set url_rel = url_for('share_report', token=g.share_token, **request.args) %}
+  {% set url_zip = url_for('share_export', token=g.share_token, **request.args) %}
+  {% set url_base = url_for('share_view', token=g.share_token) %}
+{% else %}
+  {% set url_rel = url_for('report', pid=proc.id, **request.args) %}
+  {% set url_zip = url_for('export', pid=proc.id, **request.args) %}
+  {% set url_base = url_for('timeline', pid=proc.id) %}
+{% endif %}
 
-<form class="filtros" method="get">
+<div class="cabecalho">
+  <div>
+    {% if not share %}<div class="trilha"><a href="{{ url_for('index') }}">Processos</a> ›</div>{% endif %}
+    <h1>{{ proc.title }}</h1>
+    <div class="resumo">
+      {% if proc.number %}<code>{{ proc.number }}</code>{% endif %}
+      <span><strong>{{ stats.n }}</strong> registro(s)</span>
+      {% if stats.a %}<span>{{ stats.a|fmt_dt }} → {{ stats.b|fmt_dt }}</span>{% endif %}
+      <span>{{ kinds.get('imagem', 0) }} imagens · {{ kinds.get('audio', 0) }} áudios · {{ kinds.get('video', 0) }} vídeos · {{ kinds.get('documento', 0) }} docs</span>
+    </div>
+  </div>
+  <div class="acoes">
+    {% if has_feature('relatorio') %}<a class="botao secundario" href="{{ url_rel }}">Relatório</a>{% endif %}
+    {% if has_feature('exportar') %}<a class="botao secundario" href="{{ url_zip }}" title="Todos os originais + manifesto com hashes">⬇ ZIP</a>{% endif %}
+    {% if not share %}
+      <a class="botao secundario" href="{{ url_for('process_edit', pid=proc.id) }}">Processo{% if has_feature('compartilhar') %} e link{% endif %}</a>
+      <a class="botao" href="{{ url_for('new', pid=proc.id) }}">+ Nova prova</a>
+    {% endif %}
+  </div>
+</div>
+{% if proc.description and share %}<p class="sutil" style="white-space:pre-wrap;margin-top:-8px">{{ proc.description }}</p>{% endif %}
+
+<form class="barra" method="get">
   <input type="search" name="q" value="{{ f.q }}" placeholder="Buscar em título, descrição, origem, pessoas">
   <label>De <input type="date" name="de" value="{{ f.de }}"></label>
   <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
@@ -18,44 +47,92 @@
     {% endfor %}
   </select>
   <label class="check"><input type="checkbox" name="destaque" value="1" {% if f.destaque %}checked{% endif %}> Só destaques</label>
-  <button class="botao secundario">Filtrar</button>
-  {% if f.values()|select|list %}<a href="{{ url_for('timeline') }}">Limpar</a>{% endif %}
-  <a class="direita" href="{{ url_for('export', **request.args) }}">⬇ Baixar pacote (ZIP + manifesto)</a>
+  <button class="botao secundario mini">Filtrar</button>
+  {% if f.values()|select|list %}<a href="{{ url_base }}" class="pequeno">Limpar</a>{% endif %}
+  <span class="separador"></span>
+  <div class="alternar" role="group" aria-label="Formato da linha do tempo">
+    <a href="{{ self_url(modo='vertical') }}" class="{{ 'ativo' if modo == 'vertical' }}">↕ Vertical</a>
+    {% if horizontal_ok %}
+      <a href="{{ self_url(modo='horizontal') }}" class="{{ 'ativo' if modo == 'horizontal' }}">↔ Horizontal</a>
+    {% elif not share %}
+      <a href="{{ url_for('plan') }}" class="bloqueado" title="Disponível no plano Pro">↔ Horizontal <span class="selo pro">Pro</span></a>
+    {% endif %}
+  </div>
 </form>
+
+{% macro evento_corpo(e, compact) %}
+  <div class="corpo">
+    <header>
+      <h3>{% if e.important %}<span class="estrela" title="Destaque">★</span> {% endif %}{{ e.title }}</h3>
+      {% if not share %}<a class="editar" href="{{ url_for('edit', pid=proc.id, eid=e.id) }}">Editar</a>{% endif %}
+    </header>
+    {% if e.source or e.people %}
+    <p class="meta">
+      {% if e.source %}<span>{{ e.source }}</span>{% endif %}
+      {% if e.people %}<span>Envolvidos: {{ e.people }}</span>{% endif %}
+    </p>
+    {% endif %}
+    {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
+    {% if e.files %}
+    <div class="midias">{% for fl in e.files %}{{ media(fl, compact=compact) }}{% endfor %}</div>
+    {% endif %}
+  </div>
+{% endmacro %}
 
 {% if not days %}
   <div class="vazio">
-    {% if stats.n %}Nenhum registro com esses filtros.
-    {% else %}Nenhuma prova cadastrada ainda.{% if session.role == 'admin' %} <a href="{{ url_for('new') }}">Adicionar a primeira</a>.{% endif %}{% endif %}
+    {% if stats.n %}<strong>Nenhum registro com esses filtros</strong><a href="{{ url_base }}">Limpar filtros</a>
+    {% else %}<strong>Nenhuma prova cadastrada ainda</strong>
+      {% if not share %}Adicione prints, áudios, vídeos e documentos na ordem em que aconteceram.<br><br>
+      <a class="botao" href="{{ url_for('new', pid=proc.id) }}">+ Adicionar a primeira prova</a>{% endif %}
+    {% endif %}
   </div>
-{% endif %}
+{% else %}
+  {% if days|length > 1 %}
+  <nav class="dias-atalho nao-imprimir" aria-label="Ir para o dia">
+    {% for day, evs in days %}<a href="#d{{ day }}" data-dia="d{{ day }}">{{ (day ~ 'T00:00')|fmt_day_short }} <span class="sutil">({{ evs|length }})</span></a>{% endfor %}
+  </nav>
+  {% endif %}
 
-<div class="linha">
-{% for day, evs in days %}
-  <section class="dia">
-    <h2 class="dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }}</span></h2>
-    {% for e in evs %}
-    <article class="evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
-      <div class="hora">{{ e.occurred_at|hora }}</div>
-      <div class="corpo">
-        <header>
-          <h3>{% if e.important %}<span class="estrela" title="Destaque">★</span> {% endif %}{{ e.title }}</h3>
-          {% if session.role == 'admin' %}<a class="editar" href="{{ url_for('edit', eid=e.id) }}">Editar</a>{% endif %}
-        </header>
-        {% if e.source or e.people %}
-        <p class="meta">
-          {% if e.source %}<span>Origem: {{ e.source }}</span>{% endif %}
-          {% if e.people %}<span>Envolvidos: {{ e.people }}</span>{% endif %}
-        </p>
-        {% endif %}
-        {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
-        {% if e.files %}
-        <div class="midias">{% for fl in e.files %}{{ media(fl) }}{% endfor %}</div>
-        {% endif %}
-      </div>
-    </article>
+  {% if modo == 'horizontal' %}
+  <div class="htl" data-htl>
+    <button type="button" class="htl-nav ant" aria-label="Anterior">‹</button>
+    <div class="htl-trilho" tabindex="0">
+      {% for day, evs in days %}
+      <section class="htl-dia" id="d{{ day }}">
+        <h2 class="htl-dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }}</span></h2>
+        <div class="htl-eventos">
+          {% for e in evs %}
+          <article class="htl-evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
+            <span class="htl-hora">{{ e.occurred_at|hora }}</span>
+            {{ evento_corpo(e, True) }}
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+    <button type="button" class="htl-nav prox" aria-label="Próximo">›</button>
+    <div class="htl-regua nao-imprimir">
+      <span>{{ days[0][0]|fmt_date }}</span>
+      <input type="range" min="0" max="1000" value="0" aria-label="Navegar pela linha do tempo">
+      <span>{{ days[-1][0]|fmt_date }}</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="linha">
+    {% for day, evs in days %}
+    <section class="dia" id="d{{ day }}">
+      <h2 class="dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }} <small>{{ evs|length }} registro(s)</small></span></h2>
+      {% for e in evs %}
+      <article class="evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
+        <div class="hora">{{ e.occurred_at|hora }}</div>
+        {{ evento_corpo(e, False) }}
+      </article>
+      {% endfor %}
+    </section>
     {% endfor %}
-  </section>
-{% endfor %}
-</div>
+  </div>
+  {% endif %}
+{% endif %}
 {% endblock %}

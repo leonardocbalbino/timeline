@@ -11,6 +11,83 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') lb.hidden = true; });
 
+  // Confirmação antes de ações destrutivas
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-confirmar]');
+    if (b && !confirm(b.getAttribute('data-confirmar'))) e.preventDefault();
+  });
+
+  // Copiar link / código Pix / mensagem de acesso
+  function copiar(texto, botao) {
+    var ok = function () {
+      var orig = botao.textContent;
+      botao.textContent = 'Copiado ✓';
+      setTimeout(function () { botao.textContent = orig; }, 1800);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(texto).then(ok);
+    } else {
+      var t = document.createElement('textarea');
+      t.value = texto; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); ok(); } catch (err) { /* sem suporte */ }
+      document.body.removeChild(t);
+    }
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-copiar], [data-copiar-texto]');
+    if (!b) return;
+    var alvo = b.getAttribute('data-copiar');
+    copiar(alvo ? document.getElementById(alvo).value : b.getAttribute('data-copiar-texto'), b);
+  });
+
+  // Linha do tempo horizontal: botões, régua e atalhos de dia
+  var htl = document.querySelector('[data-htl]');
+  if (htl) {
+    var trilho = htl.querySelector('.htl-trilho');
+    var ant = htl.querySelector('.htl-nav.ant'), prox = htl.querySelector('.htl-nav.prox');
+    var regua = htl.querySelector('input[type=range]');
+    var arrastandoRegua = false;
+    var atualizar = function () {
+      var max = trilho.scrollWidth - trilho.clientWidth;
+      ant.disabled = trilho.scrollLeft <= 2;
+      prox.disabled = trilho.scrollLeft >= max - 2;
+      if (regua) {
+        regua.parentNode.hidden = max <= 0;
+        if (!arrastandoRegua) regua.value = max > 0 ? Math.round(trilho.scrollLeft / max * 1000) : 0;
+      }
+    };
+    var passo = function (dir) { trilho.scrollBy({ left: dir * trilho.clientWidth * 0.8, behavior: 'smooth' }); };
+    ant.addEventListener('click', function () { passo(-1); });
+    prox.addEventListener('click', function () { passo(1); });
+    trilho.addEventListener('scroll', atualizar, { passive: true });
+    window.addEventListener('resize', atualizar);
+    trilho.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { passo(1); e.preventDefault(); }
+      if (e.key === 'ArrowLeft') { passo(-1); e.preventDefault(); }
+    });
+    if (regua) {
+      regua.addEventListener('input', function () {
+        arrastandoRegua = true;
+        trilho.style.scrollBehavior = 'auto';
+        trilho.scrollLeft = regua.value / 1000 * (trilho.scrollWidth - trilho.clientWidth);
+        trilho.style.scrollBehavior = '';
+      });
+      regua.addEventListener('change', function () { arrastandoRegua = false; });
+    }
+    var irPara = function (id) {
+      var el = document.getElementById(id);
+      if (!el || !trilho.contains(el)) return false;
+      trilho.scrollTo({ left: el.offsetLeft - trilho.offsetLeft - 8, behavior: 'smooth' });
+      htl.scrollIntoView({ block: 'nearest' });
+      return true;
+    };
+    document.querySelectorAll('.dias-atalho a').forEach(function (a) {
+      a.addEventListener('click', function (e) { if (irPara(a.getAttribute('data-dia'))) e.preventDefault(); });
+    });
+    if (location.hash) irPara(location.hash.slice(1));
+    atualizar();
+  }
+
   var form = document.getElementById('form-prova');
   if (!form) return;
   var input = document.getElementById('arquivos');

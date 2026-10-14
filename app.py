@@ -1,207 +1,27 @@
-"""Linha do Tempo de Provas - sistema leve para organizar prints, áudios e vídeos
-em ordem cronológica, com hash SHA-256 de cada arquivo e registro de auditoria."""
+"""Linha do Tempo de Provas - sistema multi-cliente para organizar prints, áudios e vídeos
+em ordem cronológica por processo, com hash SHA-256 de cada arquivo e registro de auditoria."""
 import csv
 import hashlib
 import io
 import os
 import secrets
-import sqlite3
 import tempfile
 import time
-import uuid
 import zipfile
-from datetime import datetime
-from functools import wraps
-from urllib.parse import quote
-from zoneinfo import ZoneInfo
 
-from flask import (Flask, abort, flash, g, redirect, render_template, request,
-                   send_file, session, url_for, Response)
+from flask import (abort, flash, g, redirect, render_template, request,
+                   send_file, session, url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.environ.get("DATA_DIR", os.path.join(BASE, "data"))
-UPLOADS = os.path.join(DATA, "uploads")
-DB_PATH = os.path.join(DATA, "provas.db")
-TZ = ZoneInfo(os.environ.get("TZ_NAME", "America/Sao_Paulo"))
-USE_X_ACCEL = os.environ.get("USE_X_ACCEL", "1") == "1"
+from core import (DATA, UPLOADS, app, audit, client_ip, db, effective_plan, feature_required,
+                  fmt_dt, guess_mime, has_feature, human_size, init_db, kind_for, login_required,
+                  now, parse_dt, password_fingerprint, plan_cfg, plans, process_count, quota_left,
+                  serve_upload, setting, slug, storage_used, store_upload, tenant_required, today,
+                  unlink_upload)
+import pix
 
-os.makedirs(UPLOADS, exist_ok=True)
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-app.config.update(
-    MAX_CONTENT_LENGTH=4 * 1024 ** 3,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    PERMANENT_SESSION_LIFETIME=60 * 60 * 12,
-)
-
-PASSWORDS = {
-    "admin": os.environ.get("ADMIN_PASSWORD", ""),
-    "leitor": os.environ.get("VIEWER_PASSWORD", ""),
-}
-
-MIME_FIX = {".opus": "audio/ogg", ".ogg": "audio/ogg", ".m4a": "audio/mp4",
-            ".aac": "audio/aac", ".amr": "audio/amr", ".mp3": "audio/mpeg",
-            ".wav": "audio/wav", ".mp4": "video/mp4", ".mov": "video/quicktime",
-            ".webm": "video/webm", ".3gp": "video/3gpp", ".mkv": "video/x-matroska",
-            ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-            ".webp": "image/webp", ".gif": "image/gif", ".heic": "image/heic",
-            ".pdf": "application/pdf", ".txt": "text/plain"}
-
-DIAS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira",
-        "Sexta-feira", "Sábado", "Domingo"]
-MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
-         "agosto", "setembro", "outubro", "novembro", "dezembro"]
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS evidences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    occurred_at TEXT NOT NULL,          -- YYYY-MM-DDTHH:MM:SS (horário de Brasília)
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    source TEXT NOT NULL DEFAULT '',
-    people TEXT NOT NULL DEFAULT '',
-    important INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_ev_when ON evidences(occurred_at);
-CREATE TABLE IF NOT EXISTS files (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    evidence_id INTEGER NOT NULL REFERENCES evidences(id) ON DELETE CASCADE,
-    stored_name TEXT NOT NULL,
-    original_name TEXT NOT NULL,
-    mime TEXT NOT NULL,
-    kind TEXT NOT NULL,                 -- imagem | audio | video | documento
-    size INTEGER NOT NULL,
-    sha256 TEXT NOT NULL,
-    uploaded_at TEXT NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_files_ev ON files(evidence_id);
-CREATE TABLE IF NOT EXISTS audit (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    at TEXT NOT NULL,
-    role TEXT NOT NULL,
-    ip TEXT NOT NULL,
-    action TEXT NOT NULL,
-    detail TEXT NOT NULL DEFAULT ''
-);
-"""
-
-
-# ---------------------------------------------------------------- utilidades
-def now():
-    return datetime.now(TZ).strftime("%Y-%m-%dT%H:%M:%S")
-
-
-def db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys=ON")
-        g.db.execute("PRAGMA journal_mode=WAL")
-    return g.db
-
-
-@app.teardown_appcontext
-def close_db(_exc):
-    conn = g.pop("db", None)
-    if conn is not None:
-        conn.close()
-
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.executescript(SCHEMA)
-    conn.close()
-
-
-def client_ip():
-    return request.headers.get("X-Real-IP") or request.remote_addr or "?"
-
-
-def audit(action, detail=""):
-    db().execute("INSERT INTO audit(at, role, ip, action, detail) VALUES (?,?,?,?,?)",
-                 (now(), session.get("role", "-"), client_ip(), action, detail))
-    db().commit()
-
-
-def kind_for(mime):
-    if mime.startswith("image/"):
-        return "imagem"
-    if mime.startswith("audio/"):
-        return "audio"
-    if mime.startswith("video/"):
-        return "video"
-    return "documento"
-
-
-def guess_mime(filename, fallback):
-    ext = os.path.splitext(filename)[1].lower()
-    return MIME_FIX.get(ext) or fallback or "application/octet-stream"
-
-
-def human_size(n):
-    for unit in ["B", "KB", "MB", "GB"]:
-        if n < 1024 or unit == "GB":
-            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
-        n /= 1024
-
-
-def parse_dt(s):
-    try:
-        return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return datetime.strptime(s[:16], "%Y-%m-%dT%H:%M")
-
-
-def fmt_day(s):
-    d = parse_dt(s)
-    return f"{DIAS[d.weekday()]}, {d.day} de {MESES[d.month - 1]} de {d.year}"
-
-
-def fmt_dt(s):
-    d = parse_dt(s)
-    return d.strftime("%d/%m/%Y %H:%M:%S")
-
-
-app.jinja_env.filters.update(human_size=human_size, fmt_day=fmt_day, fmt_dt=fmt_dt,
-                             hora=lambda s: s[11:19] if s[17:19] != "00" else s[11:16])
-
-
-# ---------------------------------------------------------------- autenticação
+# ---------------------------------------------------------------- login
 _fails = {}
-
-
-def login_required(role=None):
-    def deco(fn):
-        @wraps(fn)
-        def wrapper(*a, **kw):
-            if "role" not in session:
-                return redirect(url_for("login", next=request.full_path))
-            if role == "admin" and session["role"] != "admin":
-                abort(403)
-            return fn(*a, **kw)
-        return wrapper
-    return deco
-
-
-def csrf_token():
-    if "csrf" not in session:
-        session["csrf"] = secrets.token_hex(16)
-    return session["csrf"]
-
-
-app.jinja_env.globals["csrf_token"] = csrf_token
-
-
-@app.before_request
-def check_csrf():
-    if request.method == "POST" and request.endpoint != "login":
-        if request.form.get("csrf") != session.get("csrf"):
-            abort(400, "Token de segurança inválido. Recarregue a página.")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -212,21 +32,31 @@ def login():
         if len(fails) >= 8:
             flash("Muitas tentativas. Aguarde 15 minutos.", "erro")
             return render_template("login.html"), 429
+        email = request.form.get("email", "").strip().lower()
         pwd = request.form.get("senha", "")
-        role = next((r for r, p in PASSWORDS.items()
-                     if p and secrets.compare_digest(p, pwd)), None)
-        if role:
+        u = db().execute("SELECT u.*, t.active AS t_active FROM users u "
+                         "LEFT JOIN tenants t ON t.id = u.tenant_id WHERE u.email=?",
+                         (email,)).fetchone()
+        if u and u["active"] and check_password_hash(u["password_hash"], pwd):
+            if u["role"] != "admin" and not u["t_active"]:
+                flash("Sua conta está desativada. Fale com o administrador.", "erro")
+                return render_template("login.html"), 403
             _fails.pop(ip, None)
             session.clear()
             session.permanent = True
-            session["role"] = role
-            audit("login")
+            session["uid"] = u["id"]
+            session["pwv"] = password_fingerprint(u)
+            db().execute("UPDATE users SET last_login=? WHERE id=?", (now(), u["id"]))
+            g.user = u
+            audit("login", tenant_id=u["tenant_id"])
             nxt = request.args.get("next", "")
-            return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("timeline"))
+            if nxt.startswith("/") and not nxt.startswith("//"):
+                return redirect(nxt)
+            return redirect(url_for("index"))
         fails.append(time.time())
         _fails[ip] = fails
         time.sleep(1)
-        flash("Senha incorreta.", "erro")
+        flash("E-mail ou senha incorretos.", "erro")
     return render_template("login.html")
 
 
@@ -236,10 +66,144 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ---------------------------------------------------------------- consultas
-def load_evidences(filters):
-    sql = "SELECT * FROM evidences WHERE 1=1"
-    args = []
+@app.route("/conta", methods=["GET", "POST"])
+@login_required
+def account():
+    if request.method == "POST":
+        atual = request.form.get("atual", "")
+        nova = request.form.get("nova", "")
+        if not check_password_hash(g.user["password_hash"], atual):
+            flash("Senha atual incorreta.", "erro")
+        elif len(nova) < 8:
+            flash("A nova senha precisa ter pelo menos 8 caracteres.", "erro")
+        elif nova != request.form.get("confirma", ""):
+            flash("A confirmação não confere com a nova senha.", "erro")
+        else:
+            h = generate_password_hash(nova)
+            db().execute("UPDATE users SET password_hash=? WHERE id=?", (h, g.user["id"]))
+            db().commit()
+            session["pwv"] = h[-16:]
+            audit("trocar_senha", tenant_id=g.user["tenant_id"])
+            flash("Senha alterada.", "ok")
+            return redirect(url_for("index"))
+    return render_template("account.html")
+
+
+# ---------------------------------------------------------------- processos
+@app.route("/")
+@login_required
+def index():
+    if g.user["role"] == "admin" and not g.impersonating:
+        return redirect(url_for("admin_home"))
+    tid = g.tenant["id"]
+    procs = db().execute("""
+        SELECT p.*,
+               (SELECT COUNT(*) FROM evidences e WHERE e.process_id = p.id) AS n,
+               (SELECT MIN(occurred_at) FROM evidences e WHERE e.process_id = p.id) AS a,
+               (SELECT MAX(occurred_at) FROM evidences e WHERE e.process_id = p.id) AS b,
+               (SELECT COALESCE(SUM(f.size), 0) FROM files f JOIN evidences e ON e.id = f.evidence_id
+                 WHERE e.process_id = p.id) AS bytes
+        FROM processes p WHERE p.tenant_id=? ORDER BY p.updated_at DESC""", (tid,)).fetchall()
+    cfg = plan_cfg()
+    return render_template("processes.html", procs=procs, cfg=cfg,
+                           used=storage_used(tid), can_create=_can_create_process())
+
+
+def _can_create_process():
+    limit = int(plan_cfg()["max_processos"] or 0)
+    return not limit or process_count(g.tenant["id"]) < limit
+
+
+def get_process(pid):
+    p = db().execute("SELECT * FROM processes WHERE id=? AND tenant_id=?",
+                     (pid, g.tenant["id"])).fetchone()
+    if not p:
+        abort(404)
+    return p
+
+
+def read_process_form():
+    return {"title": request.form.get("titulo", "").strip()[:200],
+            "number": request.form.get("numero", "").strip()[:80],
+            "description": request.form.get("descricao", "").strip()[:4000]}
+
+
+@app.route("/processos/novo", methods=["GET", "POST"])
+@tenant_required
+def process_new():
+    if not _can_create_process():
+        flash("Seu plano atingiu o limite de processos. Assine o Pro para criar mais.", "erro")
+        return redirect(url_for("plan"))
+    if request.method == "POST":
+        p = read_process_form()
+        if not p["title"]:
+            flash("Informe um nome para o processo.", "erro")
+            return render_template("process_form.html", p=p)
+        cur = db().execute("INSERT INTO processes(tenant_id, title, number, description, created_at, "
+                           "updated_at) VALUES (?,?,?,?,?,?)",
+                           (g.tenant["id"], p["title"], p["number"], p["description"], now(), now()))
+        db().commit()
+        audit("criar_processo", f"#{cur.lastrowid} {p['title']} {p['number']}")
+        flash("Processo criado. Agora adicione as provas à linha do tempo.", "ok")
+        return redirect(url_for("timeline", pid=cur.lastrowid))
+    return render_template("process_form.html", p={})
+
+
+@app.route("/processos/<int:pid>/editar", methods=["GET", "POST"])
+@tenant_required
+def process_edit(pid):
+    proc = get_process(pid)
+    if request.method == "POST":
+        p = read_process_form()
+        db().execute("UPDATE processes SET title=?, number=?, description=?, updated_at=? WHERE id=?",
+                     (p["title"] or proc["title"], p["number"], p["description"], now(), pid))
+        db().commit()
+        audit("editar_processo", f"#{pid} {p}")
+        flash("Processo atualizado.", "ok")
+        return redirect(url_for("timeline", pid=pid))
+    return render_template("process_form.html", p=proc, editing=True)
+
+
+@app.route("/processos/<int:pid>/excluir", methods=["POST"])
+@tenant_required
+def process_delete(pid):
+    proc = get_process(pid)
+    if request.form.get("confirmar", "").strip() != proc["title"]:
+        flash("Para excluir, digite o nome do processo exatamente como aparece.", "erro")
+        return redirect(url_for("process_edit", pid=pid))
+    files = db().execute("SELECT f.* FROM files f JOIN evidences e ON e.id = f.evidence_id "
+                         "WHERE e.process_id=?", (pid,)).fetchall()
+    db().execute("DELETE FROM processes WHERE id=?", (pid,))
+    db().commit()
+    for f in files:
+        unlink_upload(f["stored_name"])
+    audit("excluir_processo", f"#{pid} {proc['title']} | {len(files)} arquivo(s): " +
+          "; ".join(f"{f['original_name']} sha256={f['sha256']}" for f in files))
+    flash("Processo excluído.", "ok")
+    return redirect(url_for("index"))
+
+
+@app.route("/processos/<int:pid>/compartilhar", methods=["POST"])
+@tenant_required
+@feature_required("compartilhar")
+def process_share(pid):
+    get_process(pid)
+    if request.form.get("acao") == "revogar":
+        db().execute("UPDATE processes SET share_token=NULL WHERE id=?", (pid,))
+        audit("revogar_link", f"#{pid}")
+        flash("Link de acesso revogado. Quem tinha o link não consegue mais abrir.", "ok")
+    else:
+        db().execute("UPDATE processes SET share_token=? WHERE id=?", (secrets.token_urlsafe(24), pid))
+        audit("gerar_link", f"#{pid}")
+        flash("Novo link somente leitura gerado. O link anterior, se existia, deixou de funcionar.", "ok")
+    db().commit()
+    return redirect(url_for("process_edit", pid=pid) + "#compartilhar")
+
+
+# ---------------------------------------------------------------- linha do tempo
+def load_evidences(process_id, filters):
+    sql = "SELECT * FROM evidences WHERE process_id=?"
+    args = [process_id]
     if filters.get("de"):
         sql += " AND occurred_at >= ?"
         args.append(filters["de"])
@@ -282,29 +246,53 @@ def current_filters():
     return {k: request.args.get(k, "").strip() for k in ("q", "de", "ate", "tipo", "destaque")}
 
 
-@app.route("/")
-@login_required()
-def timeline():
+def view_mode():
+    """Vertical é o padrão; a escolha do usuário fica guardada na sessão."""
+    modo = request.args.get("modo")
+    if modo in ("vertical", "horizontal"):
+        session["modo"] = modo
+    modo = session.get("modo", "vertical")
+    if modo == "horizontal" and not has_feature("timeline_horizontal"):
+        modo = "vertical"
+    return modo
+
+
+def render_timeline(proc, share=False):
     f = current_filters()
-    evs = load_evidences(f)
+    evs = load_evidences(proc["id"], f)
     stats = db().execute("SELECT COUNT(*) n, MIN(occurred_at) a, MAX(occurred_at) b "
-                         "FROM evidences").fetchone()
-    kinds = dict(db().execute("SELECT kind, COUNT(*) FROM files GROUP BY kind").fetchall())
-    return render_template("timeline.html", days=group_by_day(evs), total=len(evs),
-                           stats=stats, kinds=kinds, f=f)
+                         "FROM evidences WHERE process_id=?", (proc["id"],)).fetchone()
+    kinds = dict(db().execute("SELECT f.kind, COUNT(*) FROM files f JOIN evidences e "
+                              "ON e.id = f.evidence_id WHERE e.process_id=? GROUP BY f.kind",
+                              (proc["id"],)).fetchall())
+    return render_template("timeline.html", proc=proc, days=group_by_day(evs), total=len(evs),
+                           stats=stats, kinds=kinds, f=f, modo=view_mode(), share=share)
 
 
-@app.route("/relatorio")
-@login_required()
-def report():
+@app.route("/processos/<int:pid>")
+@tenant_required
+def timeline(pid):
+    return render_timeline(get_process(pid))
+
+
+@app.route("/processos/<int:pid>/relatorio")
+@tenant_required
+@feature_required("relatorio")
+def report(pid):
+    proc = get_process(pid)
+    return _render_report(proc)
+
+
+def _render_report(proc):
     f = current_filters()
-    evs = load_evidences(f)
-    audit("relatorio", str({k: v for k, v in f.items() if v}))
-    return render_template("report.html", days=group_by_day(evs), total=len(evs),
+    evs = load_evidences(proc["id"], f)
+    audit("relatorio", f"#{proc['id']} " + str({k: v for k, v in f.items() if v}),
+          tenant_id=proc["tenant_id"])
+    return render_template("report.html", proc=proc, days=group_by_day(evs), total=len(evs),
                            generated=fmt_dt(now()), f=f)
 
 
-# ---------------------------------------------------------------- arquivos
+# ---------------------------------------------------------------- provas
 def save_uploads(evidence_id, uploads):
     saved = []
     pos = db().execute("SELECT COALESCE(MAX(position), -1) + 1 FROM files WHERE evidence_id=?",
@@ -312,23 +300,7 @@ def save_uploads(evidence_id, uploads):
     for up in uploads:
         if not up or not up.filename:
             continue
-        original = os.path.basename(up.filename.replace("\\", "/"))[:200]
-        ext = os.path.splitext(original)[1].lower()[:10]
-        stored = f"{uuid.uuid4().hex}{ext}"
-        path = os.path.join(UPLOADS, stored)
-        h = hashlib.sha256()
-        size = 0
-        with open(path, "wb") as out:
-            while True:
-                chunk = up.stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                h.update(chunk)
-                size += len(chunk)
-                out.write(chunk)
-        os.chmod(path, 0o440)
-        mime = guess_mime(original, up.mimetype)
-        digest = h.hexdigest()
+        stored, original, mime, size, digest = store_upload(up)
         db().execute("INSERT INTO files(evidence_id, stored_name, original_name, mime, kind, "
                      "size, sha256, uploaded_at, position) VALUES (?,?,?,?,?,?,?,?,?)",
                      (evidence_id, stored, original, mime, kind_for(mime), size, digest,
@@ -336,6 +308,17 @@ def save_uploads(evidence_id, uploads):
         pos += 1
         saved.append(f"{original} sha256={digest}")
     return saved
+
+
+def quota_ok():
+    left = quota_left()
+    if left is None or not request.files:
+        return True
+    if (request.content_length or 0) > left:
+        flash(f"Espaço insuficiente no seu plano (restam {human_size(max(left, 0))}). "
+              "Remova arquivos ou assine o Pro.", "erro")
+        return False
+    return True
 
 
 def read_form():
@@ -355,52 +338,63 @@ def read_form():
     }
 
 
-@app.route("/novo", methods=["GET", "POST"])
-@login_required("admin")
-def new():
+def touch_process(pid):
+    db().execute("UPDATE processes SET updated_at=? WHERE id=?", (now(), pid))
+
+
+@app.route("/processos/<int:pid>/provas/nova", methods=["GET", "POST"])
+@tenant_required
+def new(pid):
+    proc = get_process(pid)
     if request.method == "POST":
+        if not quota_ok():
+            return redirect(url_for("new", pid=pid))
         try:
             ev = read_form()
         except ValueError:
             flash("Data ou hora inválida.", "erro")
-            return render_template("form.html", ev=request.form, files=[]), 400
+            return render_template("form.html", proc=proc, ev=request.form, files=[]), 400
         if not ev["title"]:
             flash("Informe um título.", "erro")
-            return render_template("form.html", ev=request.form, files=[]), 400
-        cur = db().execute("INSERT INTO evidences(occurred_at, title, description, source, "
-                           "people, important, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                           (ev["occurred_at"], ev["title"], ev["description"], ev["source"],
+            return render_template("form.html", proc=proc, ev=request.form, files=[]), 400
+        cur = db().execute("INSERT INTO evidences(process_id, occurred_at, title, description, source, "
+                           "people, important, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                           (pid, ev["occurred_at"], ev["title"], ev["description"], ev["source"],
                             ev["people"], ev["important"], now(), now()))
         eid = cur.lastrowid
         saved = save_uploads(eid, request.files.getlist("arquivos"))
+        touch_process(pid)
         db().commit()
-        audit("criar", f"#{eid} {ev['occurred_at']} {ev['title']} | " + "; ".join(saved))
+        audit("criar", f"processo #{pid} prova #{eid} {ev['occurred_at']} {ev['title']} | " + "; ".join(saved))
         flash("Prova adicionada à linha do tempo.", "ok")
         if request.form.get("continuar"):
-            return redirect(url_for("new", data=ev["occurred_at"][:10]))
-        return redirect(url_for("timeline") + f"#e{eid}")
-    return render_template("form.html", ev={"data": request.args.get("data", "")}, files=[])
+            return redirect(url_for("new", pid=pid, data=ev["occurred_at"][:10]))
+        return redirect(url_for("timeline", pid=pid) + f"#e{eid}")
+    return render_template("form.html", proc=proc, ev={"data": request.args.get("data", "")}, files=[])
 
 
-def get_ev(eid):
-    ev = db().execute("SELECT * FROM evidences WHERE id=?", (eid,)).fetchone()
+def get_ev(pid, eid):
+    ev = db().execute("SELECT * FROM evidences WHERE id=? AND process_id=?", (eid, pid)).fetchone()
     if not ev:
         abort(404)
     return ev
 
 
-@app.route("/prova/<int:eid>/editar", methods=["GET", "POST"])
-@login_required("admin")
-def edit(eid):
-    ev = get_ev(eid)
+@app.route("/processos/<int:pid>/provas/<int:eid>/editar", methods=["GET", "POST"])
+@tenant_required
+def edit(pid, eid):
+    proc = get_process(pid)
+    ev = get_ev(pid, eid)
     files = db().execute("SELECT * FROM files WHERE evidence_id=? ORDER BY position, id",
                          (eid,)).fetchall()
     if request.method == "POST":
+        if not quota_ok():
+            return redirect(url_for("edit", pid=pid, eid=eid))
         try:
             new_ev = read_form()
         except ValueError:
             flash("Data ou hora inválida.", "erro")
-            return redirect(url_for("edit", eid=eid))
+            return redirect(url_for("edit", pid=pid, eid=eid))
         db().execute("UPDATE evidences SET occurred_at=?, title=?, description=?, source=?, "
                      "people=?, important=?, updated_at=? WHERE id=?",
                      (new_ev["occurred_at"], new_ev["title"] or ev["title"],
@@ -412,68 +406,58 @@ def edit(eid):
                              (fid, eid)).fetchone()
             if f:
                 db().execute("DELETE FROM files WHERE id=?", (fid,))
-                _unlink(f["stored_name"])
+                unlink_upload(f["stored_name"])
                 removed.append(f"{f['original_name']} sha256={f['sha256']}")
         saved = save_uploads(eid, request.files.getlist("arquivos"))
+        touch_process(pid)
         db().commit()
         changes = {k: (ev[k], v) for k, v in new_ev.items() if str(ev[k]) != str(v)}
-        audit("editar", f"#{eid} alterações={changes} adicionados={saved} removidos={removed}")
+        audit("editar", f"processo #{pid} prova #{eid} alterações={changes} "
+                        f"adicionados={saved} removidos={removed}")
         flash("Alterações salvas.", "ok")
-        return redirect(url_for("timeline") + f"#e{eid}")
+        return redirect(url_for("timeline", pid=pid) + f"#e{eid}")
     d = dict(ev)
     d["data"], d["hora"] = ev["occurred_at"][:10], ev["occurred_at"][11:19]
-    return render_template("form.html", ev=d, files=files, editing=True)
+    return render_template("form.html", proc=proc, ev=d, files=files, editing=True)
 
 
-def _unlink(stored):
-    try:
-        os.remove(os.path.join(UPLOADS, stored))
-    except FileNotFoundError:
-        pass
-
-
-@app.route("/prova/<int:eid>/excluir", methods=["POST"])
-@login_required("admin")
-def delete(eid):
-    ev = get_ev(eid)
+@app.route("/processos/<int:pid>/provas/<int:eid>/excluir", methods=["POST"])
+@tenant_required
+def delete(pid, eid):
+    get_process(pid)
+    ev = get_ev(pid, eid)
     files = db().execute("SELECT * FROM files WHERE evidence_id=?", (eid,)).fetchall()
     db().execute("DELETE FROM evidences WHERE id=?", (eid,))
+    touch_process(pid)
     db().commit()
     for f in files:
-        _unlink(f["stored_name"])
-    audit("excluir", f"#{eid} {ev['occurred_at']} {ev['title']} | " +
+        unlink_upload(f["stored_name"])
+    audit("excluir", f"processo #{pid} prova #{eid} {ev['occurred_at']} {ev['title']} | " +
           "; ".join(f"{f['original_name']} sha256={f['sha256']}" for f in files))
     flash("Prova excluída.", "ok")
-    return redirect(url_for("timeline"))
+    return redirect(url_for("timeline", pid=pid))
 
 
+# ---------------------------------------------------------------- arquivos
 @app.route("/arquivo/<int:fid>")
-@login_required()
+@tenant_required
 def file(fid):
-    f = db().execute("SELECT * FROM files WHERE id=?", (fid,)).fetchone()
+    f = db().execute("SELECT f.* FROM files f JOIN evidences e ON e.id = f.evidence_id "
+                     "JOIN processes p ON p.id = e.process_id WHERE f.id=? AND p.tenant_id=?",
+                     (fid, g.tenant["id"])).fetchone()
     if not f:
         abort(404)
     download = request.args.get("baixar") == "1"
     if download:
         audit("baixar", f"{f['original_name']} sha256={f['sha256']}")
-    disp = "attachment" if download else "inline"
-    cd = f"{disp}; filename*=UTF-8''{quote(f['original_name'])}"
-    if USE_X_ACCEL:
-        r = Response(status=200)
-        r.headers["X-Accel-Redirect"] = f"/_protegido/{f['stored_name']}"
-        r.headers["Content-Type"] = f["mime"]
-        r.headers["Content-Disposition"] = cd
-        r.headers["Cache-Control"] = "private, max-age=3600"
-        return r
-    r = send_file(os.path.join(UPLOADS, f["stored_name"]), mimetype=f["mime"], conditional=True)
-    r.headers["Content-Disposition"] = cd
-    return r
+    return serve_upload(f["stored_name"], f["mime"], f["original_name"], download)
 
 
 @app.route("/verificar", methods=["GET", "POST"])
-@login_required()
+@tenant_required
+@feature_required("verificar")
 def verify():
-    """Confere se um arquivo é idêntico (mesmo SHA-256) a algum arquivo registrado."""
+    """Confere se um arquivo é idêntico (mesmo SHA-256) a algum arquivo registrado na conta."""
     result = None
     if request.method == "POST":
         up = request.files.get("arquivo")
@@ -482,18 +466,19 @@ def verify():
             for chunk in iter(lambda: up.stream.read(1024 * 1024), b""):
                 h.update(chunk)
             digest = h.hexdigest()
-            rows = db().execute("SELECT f.*, e.title, e.occurred_at FROM files f JOIN evidences e "
-                                "ON e.id = f.evidence_id WHERE f.sha256=?", (digest,)).fetchall()
+            rows = db().execute("SELECT f.*, e.title, e.occurred_at, e.process_id, p.title AS proc_title "
+                                "FROM files f JOIN evidences e ON e.id = f.evidence_id "
+                                "JOIN processes p ON p.id = e.process_id "
+                                "WHERE f.sha256=? AND p.tenant_id=?",
+                                (digest, g.tenant["id"])).fetchall()
             result = {"name": up.filename, "sha256": digest, "matches": rows}
     return render_template("verify.html", result=result)
 
 
-@app.route("/exportar")
-@login_required()
-def export():
+def build_export(proc):
     """Gera um ZIP com todos os arquivos, organizados por data, e um manifesto CSV."""
-    evs = load_evidences(current_filters())
-    audit("exportar", f"{len(evs)} provas")
+    evs = load_evidences(proc["id"], current_filters())
+    audit("exportar", f"processo #{proc['id']} {len(evs)} provas", tenant_id=proc["tenant_id"])
     tmp = tempfile.NamedTemporaryFile(prefix="export-", suffix=".zip", dir=DATA, delete=False)
     tmp.close()
     manifest = io.StringIO()
@@ -515,6 +500,7 @@ def export():
                             f["kind"], f["size"], f["sha256"], fmt_dt(f["uploaded_at"])])
         z.writestr("manifesto.csv", "﻿" + manifest.getvalue())
         z.writestr("LEIA-ME.txt",
+                   f"Processo: {proc['title']} {proc['number']}\n"
                    "Pacote exportado da Linha do Tempo de Provas em " + fmt_dt(now()) + ".\n"
                    "O arquivo manifesto.csv lista cada prova em ordem cronológica e o hash\n"
                    "SHA-256 de cada arquivo, calculado no momento do envio ao sistema.\n"
@@ -523,22 +509,185 @@ def export():
                    "  Linux/Mac: sha256sum <arquivo>  /  shasum -a 256 <arquivo>\n")
 
     resp = send_file(tmp.name, mimetype="application/zip", as_attachment=True,
-                     download_name=f"provas_{now()[:10]}.zip")
+                     download_name=f"provas_{slug(proc['title'])}_{today()}.zip")
     resp.call_on_close(lambda: os.path.exists(tmp.name) and os.remove(tmp.name))
     return resp
 
 
+@app.route("/processos/<int:pid>/exportar")
+@tenant_required
+@feature_required("exportar")
+def export(pid):
+    return build_export(get_process(pid))
+
+
 @app.route("/auditoria")
-@login_required("admin")
+@tenant_required
+@feature_required("auditoria")
 def audit_log():
-    rows = db().execute("SELECT * FROM audit ORDER BY id DESC LIMIT 1000").fetchall()
+    rows = db().execute("SELECT * FROM audit WHERE tenant_id=? ORDER BY id DESC LIMIT 1000",
+                        (g.tenant["id"],)).fetchall()
     return render_template("audit.html", rows=rows)
+
+
+# ---------------------------------------------------------------- link somente leitura
+def share_context(token):
+    p = db().execute("SELECT * FROM processes WHERE share_token=?", (token,)).fetchone()
+    if not p:
+        abort(404)
+    t = db().execute("SELECT * FROM tenants WHERE id=?", (p["tenant_id"],)).fetchone()
+    if not t or not t["active"] or not has_feature("compartilhar", t):
+        abort(404)
+    g.share_token = token
+    g.tenant = t
+    return p
+
+
+@app.route("/p/<token>")
+def share_view(token):
+    proc = share_context(token)
+    if not session.get(f"visto_{proc['id']}"):
+        session[f"visto_{proc['id']}"] = 1
+        audit("abrir_link", f"processo #{proc['id']}")
+    return render_timeline(proc, share=True)
+
+
+@app.route("/p/<token>/relatorio")
+def share_report(token):
+    proc = share_context(token)
+    if not has_feature("relatorio"):
+        abort(404)
+    return _render_report(proc)
+
+
+@app.route("/p/<token>/exportar")
+def share_export(token):
+    proc = share_context(token)
+    if not has_feature("exportar"):
+        abort(404)
+    return build_export(proc)
+
+
+@app.route("/p/<token>/arquivo/<int:fid>")
+def share_file(token, fid):
+    proc = share_context(token)
+    f = db().execute("SELECT f.* FROM files f JOIN evidences e ON e.id = f.evidence_id "
+                     "WHERE f.id=? AND e.process_id=?", (fid, proc["id"])).fetchone()
+    if not f:
+        abort(404)
+    download = request.args.get("baixar") == "1"
+    if download:
+        audit("baixar", f"{f['original_name']} sha256={f['sha256']}")
+    return serve_upload(f["stored_name"], f["mime"], f["original_name"], download)
+
+
+# ---------------------------------------------------------------- plano e pagamento Pix
+@app.route("/plano")
+@tenant_required
+def plan():
+    pays = db().execute("SELECT * FROM payments WHERE tenant_id=? ORDER BY id DESC LIMIT 20",
+                        (g.tenant["id"],)).fetchall()
+    return render_template("plan.html", plans=plans(), current=effective_plan(g.tenant),
+                           price=_pro_price_cents(), days=_pro_days(), pays=pays,
+                           pix_ok=bool(setting("pix_chave")), used=storage_used(g.tenant["id"]),
+                           nproc=process_count(g.tenant["id"]))
+
+
+def _pro_price_cents():
+    try:
+        return round(float(setting("pro_preco").replace(",", ".")) * 100)
+    except ValueError:
+        return 0
+
+
+def _pro_days():
+    try:
+        return max(1, int(setting("pro_dias")))
+    except ValueError:
+        return 30
+
+
+PERIODOS = (1, 3, 6, 12)
+
+
+@app.route("/plano/pix", methods=["POST"])
+@tenant_required
+def plan_pix():
+    if not setting("pix_chave") or not _pro_price_cents():
+        flash("Pagamento via Pix ainda não está configurado. Fale com o administrador.", "erro")
+        return redirect(url_for("plan"))
+    try:
+        periodos = int(request.form.get("periodos", "1"))
+    except ValueError:
+        periodos = 1
+    if periodos not in PERIODOS:
+        periodos = 1
+    txid = f"TL{g.tenant['id']}X{secrets.token_hex(8).upper()}"[:25]
+    cur = db().execute("INSERT INTO payments(tenant_id, txid, amount_cents, days, created_at) "
+                       "VALUES (?,?,?,?,?)",
+                       (g.tenant["id"], txid, _pro_price_cents() * periodos,
+                        _pro_days() * periodos, now()))
+    db().commit()
+    audit("gerar_pix", f"pagamento #{cur.lastrowid} txid={txid}")
+    return redirect(url_for("payment", pay_id=cur.lastrowid))
+
+
+def get_payment(pay_id):
+    p = db().execute("SELECT * FROM payments WHERE id=? AND tenant_id=?",
+                     (pay_id, g.tenant["id"])).fetchone()
+    if not p:
+        abort(404)
+    return p
+
+
+@app.route("/plano/pagamento/<int:pay_id>", methods=["GET", "POST"])
+@tenant_required
+def payment(pay_id):
+    pay = get_payment(pay_id)
+    if request.method == "POST" and pay["status"] in ("pendente", "informado"):
+        if request.form.get("acao") == "cancelar":
+            db().execute("UPDATE payments SET status='cancelado', decided_at=? WHERE id=?",
+                         (now(), pay_id))
+            db().commit()
+            audit("cancelar_pix", f"pagamento #{pay_id}")
+            flash("Cobrança cancelada.", "ok")
+            return redirect(url_for("plan"))
+        up = request.files.get("comprovante")
+        stored = name = None
+        if up and up.filename:
+            stored, name, _mime, _size, _digest = store_upload(up)
+            if pay["receipt_stored"]:
+                unlink_upload(pay["receipt_stored"])
+        db().execute("UPDATE payments SET status='informado', informed_at=?, "
+                     "receipt_stored=COALESCE(?, receipt_stored), receipt_name=COALESCE(?, receipt_name), "
+                     "note=? WHERE id=?",
+                     (now(), stored, name, request.form.get("obs", "").strip()[:500], pay_id))
+        db().commit()
+        audit("informar_pix", f"pagamento #{pay_id} comprovante={name or '-'}")
+        flash("Pagamento informado. Assim que o administrador confirmar, o plano Pro é liberado.", "ok")
+        return redirect(url_for("payment", pay_id=pay_id))
+    code = pix.brcode(setting("pix_chave"), setting("pix_nome"), setting("pix_cidade"),
+                      pay["amount_cents"] / 100, pay["txid"], "Linha do Tempo Pro")
+    return render_template("payment.html", pay=pay, code=code, qr=pix.qr_svg_data_uri(code),
+                           pix_nome=setting("pix_nome"))
+
+
+@app.route("/plano/pagamento/<int:pay_id>/comprovante")
+@tenant_required
+def payment_receipt(pay_id):
+    pay = get_payment(pay_id)
+    if not pay["receipt_stored"]:
+        abort(404)
+    return serve_upload(pay["receipt_stored"], guess_mime(pay["receipt_name"], None),
+                        pay["receipt_name"], False)
 
 
 @app.errorhandler(413)
 def too_large(_e):
     return "Arquivo grande demais (limite 4 GB por envio).", 413
 
+
+import admin  # noqa: E402,F401  (registra as rotas do painel do administrador)
 
 init_db()
 

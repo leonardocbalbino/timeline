@@ -9,8 +9,8 @@ venv/bin/pip install -q -r requirements.txt
 if [ ! -f .env ]; then
   cat > .env <<ENV
 SECRET_KEY=$(openssl rand -hex 32)
+ADMIN_EMAIL=admin
 ADMIN_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)
-VIEWER_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)
 ENV
   chmod 600 .env
 fi

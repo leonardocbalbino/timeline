@@ -1,19 +1,23 @@
-{% macro media(f, report=False) -%}
+{% macro media(f, report=False, compact=False) -%}
 <figure class="midia midia-{{ f.kind }}">
   {% if f.kind == 'imagem' %}
-    <img src="{{ url_for('file', fid=f.id) }}" alt="{{ f.original_name }}" loading="lazy" class="zoom">
+    <img src="{{ file_url(f.id) }}" alt="{{ f.original_name }}" loading="lazy" class="zoom">
   {% elif f.kind == 'audio' and not report %}
-    <audio controls preload="metadata" src="{{ url_for('file', fid=f.id) }}"></audio>
+    <audio controls preload="none" src="{{ file_url(f.id) }}"></audio>
   {% elif f.kind == 'video' and not report %}
-    <video controls preload="metadata" playsinline src="{{ url_for('file', fid=f.id) }}"></video>
+    <video controls preload="metadata" playsinline src="{{ file_url(f.id) }}"></video>
   {% elif not report %}
-    <a class="doc" href="{{ url_for('file', fid=f.id) }}" target="_blank">📄 Abrir documento</a>
+    <a class="doc" href="{{ file_url(f.id) }}" target="_blank" rel="noopener">📄 Abrir documento</a>
   {% endif %}
   <figcaption>
     <span class="tipo">{{ f.kind }}</span>
-    <a href="{{ url_for('file', fid=f.id, baixar=1) }}" title="Baixar original">{{ f.original_name }}</a>
+    <a href="{{ file_url(f.id, True) }}" title="Baixar original">{{ f.original_name }}</a>
     · {{ f.size|human_size }}
+    {% if compact %}
+    <details class="hash-det"><summary>SHA-256</summary><code class="hash">{{ f.sha256 }}</code></details>
+    {% else %}
     <code class="hash" title="SHA-256 calculado no envio">SHA-256: {{ f.sha256 }}</code>
+    {% endif %}
   </figcaption>
 </figure>
 {%- endmacro %}

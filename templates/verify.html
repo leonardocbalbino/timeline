@@ -1,24 +1,29 @@
 {% extends "base.html" %}
+{% block title %}Verificar arquivo{% endblock %}
 {% block content %}
+<div class="formulario estreito">
 <form method="post" enctype="multipart/form-data" class="cartao formulario">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <h1>Verificar integridade de um arquivo</h1>
-  <p class="sutil">Envie uma cópia de um arquivo para conferir se é idêntica a algum arquivo registrado na linha do tempo. O arquivo enviado aqui não é salvo.</p>
+  <div>
+    <h1>Verificar integridade de um arquivo</h1>
+    <p class="sutil" style="margin:6px 0 0">Envie uma cópia de um arquivo para conferir se é idêntica a algum arquivo registrado nos seus processos. O arquivo enviado aqui não é salvo.</p>
+  </div>
   <label>Arquivo <input type="file" name="arquivo" required></label>
   <div class="acoes"><button class="botao">Verificar</button></div>
 </form>
 {% if result %}
 <div class="cartao resultado {% if result.matches %}ok{% else %}erro{% endif %}">
-  <p><strong>{{ result.name }}</strong><br><code class="hash">SHA-256: {{ result.sha256 }}</code></p>
+  <p style="margin-top:0"><strong>{{ result.name }}</strong><br><code class="hash">SHA-256: {{ result.sha256 }}</code></p>
   {% if result.matches %}
-    <p>✔ Idêntico ao arquivo registrado:</p>
+    <p><span class="selo ok">✔ Idêntico</span> ao arquivo registrado:</p>
     <ul>{% for m in result.matches %}
-      <li><a href="{{ url_for('timeline') }}#e{{ m.evidence_id }}">{{ m.occurred_at|fmt_dt }} — {{ m.title }}</a>
+      <li><a href="{{ url_for('timeline', pid=m.process_id) }}#e{{ m.evidence_id }}">{{ m.proc_title }} · {{ m.occurred_at|fmt_dt }} — {{ m.title }}</a>
         ({{ m.original_name }}, enviado em {{ m.uploaded_at|fmt_dt }})</li>
     {% endfor %}</ul>
   {% else %}
-    <p>✘ Nenhum arquivo registrado tem esse hash. O arquivo é diferente de todos os registrados.</p>
+    <p style="margin-bottom:0"><span class="selo erro">✘ Diferente</span> Nenhum arquivo registrado tem esse hash. O arquivo é diferente de todos os registrados.</p>
   {% endif %}
 </div>
 {% endif %}
+</div>
 {% endblock %}

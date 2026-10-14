@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Pagamento via Pix{% endblock %}
+{% block content %}
+<div class="trilha"><a href="{{ url_for('plan') }}">Plano</a> ›</div>
+<div class="cabecalho">
+  <div>
+    <h1>Pagamento do plano Pro via Pix</h1>
+    <p class="sutil" style="margin:4px 0 0">Cobrança {{ pay.txid }} · criada em {{ pay.created_at|fmt_dt }} · {% set p = pay %}{% include "_pay_status.html" %}</p>
+  </div>
+</div>
+
+<div class="cartao pix">
+  <div>
+    {% if pay.status in ('pendente', 'informado') %}<img src="{{ qr }}" alt="QR Code Pix">{% endif %}
+  </div>
+  <div class="formulario" style="gap:14px">
+    <div>
+      <div class="valor">{{ pay.amount_cents|brl }}</div>
+      <div class="sutil">Plano Pro por {{ pay.days }} dias{% if pix_nome %} · recebedor: {{ pix_nome }}{% endif %}</div>
+    </div>
+    {% if pay.status == 'confirmado' %}
+      <div class="aviso ok" style="margin:0">Pagamento confirmado. Seu plano Pro está ativo.</div>
+    {% elif pay.status in ('recusado', 'cancelado') %}
+      <div class="aviso erro" style="margin:0">Esta cobrança foi {{ pay.status }}. <a href="{{ url_for('plan') }}">Gerar uma nova</a>.</div>
+    {% else %}
+      <ol class="passos">
+        <li>Abra o app do seu banco e escolha <strong>Pix › Ler QR Code</strong> ou <strong>Pix Copia e Cola</strong>.</li>
+        <li>Confira o valor e o recebedor e conclua o pagamento.</li>
+        <li>Volte aqui e clique em <strong>Já paguei</strong>. Se puder, anexe o comprovante: a liberação fica mais rápida.</li>
+      </ol>
+      <label>Pix copia e cola
+        <div class="copiar"><input type="text" readonly value="{{ code }}" id="pix-codigo">
+          <button type="button" class="botao secundario" data-copiar="pix-codigo">Copiar</button></div></label>
+
+      {% if pay.status == 'informado' %}
+        <div class="aviso" style="margin:0">Você informou o pagamento em {{ pay.informed_at|fmt_dt }}. Assim que o administrador confirmar, o Pro é liberado automaticamente.
+          {% if pay.receipt_name %}<br>Comprovante: <a href="{{ url_for('payment_receipt', pay_id=pay.id) }}" target="_blank">{{ pay.receipt_name }}</a>{% endif %}</div>
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data" class="formulario" style="gap:12px">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <label>Comprovante <span class="ajuda">opcional — imagem ou PDF</span>
+          <input type="file" name="comprovante" accept="image/*,.pdf"></label>
+        <label>Observação <span class="ajuda">opcional</span>
+          <input type="text" name="obs" maxlength="500" value="{{ pay.note }}" placeholder="Ex.: pago pela conta da empresa"></label>
+        <div class="acoes">
+          <button class="botao sucesso" name="acao" value="informar">{{ 'Atualizar informação' if pay.status == 'informado' else 'Já paguei' }}</button>
+          <button class="botao fantasma" name="acao" value="cancelar" formnovalidate data-confirmar="Cancelar esta cobrança?">Cancelar cobrança</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Processos{% endblock %}
+{% block content %}
+<div class="cabecalho">
+  <div>
+    <h1>Processos</h1>
+    <p class="sutil" style="margin:4px 0 0">{{ g.tenant.name }}</p>
+  </div>
+  <div class="acoes">
+    {% if can_create %}<a class="botao" href="{{ url_for('process_new') }}">+ Novo processo</a>
+    {% else %}<a class="botao pro" href="{{ url_for('plan') }}">Limite atingido · Assinar Pro</a>{% endif %}
+  </div>
+</div>
+
+{% set lim_mb = cfg.max_storage_mb|int %}
+{% set lim_p = cfg.max_processos|int %}
+<div class="uso">
+  <span><strong>{{ procs|length }}</strong>{% if lim_p %} de {{ lim_p }}{% endif %} processo(s)</span>
+  <span>
+    {% if lim_mb %}{% set pc = [100, (used / (lim_mb * 1048576) * 100)|round(0, 'ceil')|int]|min %}
+      <span class="medidor {{ 'cheio' if pc >= 90 }}"><i style="width: {{ pc }}%"></i></span>
+      {{ used|human_size }} de {{ (lim_mb * 1048576)|human_size }} usados
+    {% else %}{{ used|human_size }} usados{% endif %}
+  </span>
+</div>
+
+{% if not procs %}
+<div class="vazio">
+  <strong>Nenhum processo ainda</strong>
+  Crie um processo para começar a montar a linha do tempo de provas.<br><br>
+  <a class="botao" href="{{ url_for('process_new') }}">+ Criar o primeiro processo</a>
+</div>
+{% else %}
+<div class="grade-processos">
+  {% for p in procs %}
+  <a class="cartao processo" href="{{ url_for('timeline', pid=p.id) }}">
+    <div>
+      <h3>{{ p.title }}</h3>
+      {% if p.number %}<div class="numero">{{ p.number }}</div>{% endif %}
+    </div>
+    {% if p.description %}<p>{{ p.description }}</p>{% endif %}
+    <div class="numeros">
+      <span><strong>{{ p.n }}</strong> prova(s)</span>
+      <span>{{ p.bytes|human_size }}</span>
+      {% if p.a %}<span>{{ p.a|fmt_date }} → {{ p.b|fmt_date }}</span>{% endif %}
+      {% if p.share_token %}<span title="Link somente leitura ativo">🔗</span>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+  {% if can_create %}<a class="cartao processo novo" href="{{ url_for('process_new') }}">+ Novo processo</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

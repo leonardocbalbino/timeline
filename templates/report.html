@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 {% from "_media.html" import media %}
-{% block title %}Relatório cronológico de provas{% endblock %}
+{% block title %}Relatório cronológico · {{ proc.title }}{% endblock %}
 {% block bodyclass %}relatorio{% endblock %}
 {% block content %}
 <div class="nao-imprimir barra-relatorio">
+  <a href="{{ url_for('share_view', token=g.share_token) if g.share_token else url_for('timeline', pid=proc.id) }}">← Voltar</a>
   <button class="botao" onclick="window.print()">Imprimir / Salvar em PDF</button>
-  <span class="sutil">Áudios e vídeos aparecem como referência (nome, tamanho e hash). Os arquivos originais estão no pacote ZIP.</span>
+  <span class="sutil pequeno">Áudios e vídeos aparecem como referência (nome, tamanho e hash). Os arquivos originais estão no pacote ZIP.</span>
 </div>
 <h1>Relatório cronológico de provas</h1>
-<p class="sutil">Gerado em {{ generated }} (horário de Brasília) · {{ total }} registro(s)
+<p style="margin:6px 0 2px"><strong>{{ proc.title }}</strong>{% if proc.number %} · Processo nº {{ proc.number }}{% endif %}</p>
+<p class="sutil" style="margin-top:0">Gerado em {{ generated }} (horário de Brasília) · {{ total }} registro(s)
   {% if f.de or f.ate %}· período {{ f.de or 'início' }} a {{ f.ate or 'fim' }}{% endif %}</p>
 
 <table class="tabela-relatorio">

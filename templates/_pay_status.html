@@ -1,0 +1,5 @@
+{% if p.status == 'confirmado' %}<span class="selo ok">Confirmado</span>
+{% elif p.status == 'informado' %}<span class="selo alerta">Aguardando confirmação</span>
+{% elif p.status == 'pendente' %}<span class="selo">Aguardando pagamento</span>
+{% elif p.status == 'recusado' %}<span class="selo erro">Recusado</span>
+{% else %}<span class="selo">Cancelado</span>{% endif %}

@@ -5,20 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>{% block title %}Linha do Tempo de Provas{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
-{% if session.role %}
+{% set ep = request.endpoint or '' %}
+{% if g.user %}
 <header class="topo">
-  <a class="marca" href="{{ url_for('timeline') }}">Linha do Tempo de Provas</a>
+  <a class="marca" href="{{ url_for('index') }}"><span class="marca-icone"></span><span>Linha do Tempo</span></a>
   <nav>
-    <a href="{{ url_for('timeline') }}">Linha do tempo</a>
-    {% if session.role == 'admin' %}<a class="botao" href="{{ url_for('new') }}">+ Nova prova</a>{% endif %}
-    <a href="{{ url_for('report', **request.args) }}">Relatório</a>
-    <a href="{{ url_for('verify') }}">Verificar arquivo</a>
-    {% if session.role == 'admin' %}<a href="{{ url_for('audit_log') }}">Auditoria</a>{% endif %}
-    <a href="{{ url_for('logout') }}" class="sair">Sair ({{ session.role }})</a>
+    {% if g.tenant %}
+      <a href="{{ url_for('index') }}" class="{{ 'ativo' if ep in ('index', 'timeline', 'new', 'edit', 'process_new', 'process_edit') }}">Processos</a>
+      {% if has_feature('verificar') %}<a href="{{ url_for('verify') }}" class="{{ 'ativo' if ep == 'verify' }}">Verificar arquivo</a>{% endif %}
+      {% if has_feature('auditoria') %}<a href="{{ url_for('audit_log') }}" class="{{ 'ativo' if ep == 'audit_log' }}">Auditoria</a>{% endif %}
+      <a href="{{ url_for('plan') }}" class="{{ 'ativo' if ep in ('plan', 'payment') }}">Plano</a>
+    {% endif %}
+    {% if g.user.role == 'admin' and not g.impersonating %}
+      <a href="{{ url_for('admin_home') }}" class="{{ 'ativo' if ep in ('admin_home', 'admin_client', 'admin_client_new') }}">Clientes</a>
+      <a href="{{ url_for('admin_payments') }}" class="{{ 'ativo' if ep == 'admin_payments' }}">Pagamentos</a>
+      <a href="{{ url_for('admin_plans') }}" class="{{ 'ativo' if ep == 'admin_plans' }}">Planos e Pix</a>
+      <a href="{{ url_for('admin_audit') }}" class="{{ 'ativo' if ep == 'admin_audit' }}">Auditoria</a>
+    {% endif %}
   </nav>
+  <div class="usuario">
+    {% if g.tenant %}{% set pl = effective_plan(g.tenant) %}<a href="{{ url_for('plan') }}" class="selo {{ pl }}">{{ PLAN_LABELS[pl] }}</a>{% endif %}
+    <a href="{{ url_for('account') }}" class="nome" title="Minha conta">{{ g.user.email }}</a>
+    <a href="{{ url_for('logout') }}">Sair</a>
+  </div>
+</header>
+{% if g.impersonating %}
+<div class="faixa-suporte">
+  <span>Modo suporte: você está dentro da conta de <strong>{{ g.tenant.name }}</strong>. Tudo que fizer aqui fica na auditoria.</span>
+  <form method="post" action="{{ url_for('admin_client_leave') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button class="botao mini secundario">Voltar ao painel</button>
+  </form>
+</div>
+{% endif %}
+{% elif g.share_token %}
+<header class="topo">
+  <span class="marca"><span class="marca-icone"></span><span>Linha do Tempo de Provas</span></span>
+  <nav></nav>
+  <div class="usuario"><span class="selo">Somente leitura</span></div>
 </header>
 {% endif %}
 <main>
@@ -28,6 +55,6 @@
 {% block content %}{% endblock %}
 </main>
 <div id="lightbox" hidden><img alt=""><button type="button" aria-label="Fechar">×</button></div>
-<script src="{{ url_for('static', filename='app.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=4"></script>
 </body>
 </html>

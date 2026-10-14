@@ -1,5 +1,8 @@
 {% extends "base.html" %}
+{% block title %}{{ 'Editar prova' if editing else 'Nova prova' }} · {{ proc.title }}{% endblock %}
 {% block content %}
+<div class="formulario estreito" style="gap:0">
+<div class="trilha"><a href="{{ url_for('index') }}">Processos</a> › <a href="{{ url_for('timeline', pid=proc.id) }}">{{ proc.title }}</a></div>
 <form method="post" enctype="multipart/form-data" class="cartao formulario" id="form-prova">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <h1>{% if editing %}Editar prova{% else %}Nova prova{% endif %}</h1>
@@ -8,7 +11,7 @@
     <input type="file" name="arquivos" id="arquivos" multiple
            accept="image/*,audio/*,video/*,.opus,.ogg,.m4a,.amr,.pdf,.txt">
     <span><strong>Clique ou arraste</strong> prints, áudios ou vídeos aqui.<br>
-    <small>Pode enviar vários arquivos do mesmo momento. Se o nome do arquivo tiver data (ex.: WhatsApp, Screenshot), ela é sugerida automaticamente.</small></span>
+    <small class="sutil">Pode enviar vários arquivos do mesmo momento. Se o nome do arquivo tiver data (ex.: WhatsApp, Screenshot), ela é sugerida automaticamente.</small></span>
   </label>
   <ul id="lista-arquivos" class="lista-arquivos"></ul>
 
@@ -16,7 +19,7 @@
     <label>Data do fato <input type="date" name="data" value="{{ ev.data or '' }}" required></label>
     <label>Hora <input type="time" name="hora" step="1" value="{{ ev.hora or '' }}"></label>
   </div>
-  <p class="sutil" id="sugestao"></p>
+  <p class="sutil pequeno" id="sugestao" style="margin:-8px 0 0"></p>
 
   <label>Título <input type="text" name="titulo" value="{{ ev.title or ev.titulo or '' }}" required maxlength="300"
          placeholder="Ex.: Mensagem de Fulano confirmando o horário"></label>
@@ -49,15 +52,15 @@
   <div class="acoes">
     <button type="submit" class="botao">Salvar</button>
     {% if not editing %}<button type="submit" name="continuar" value="1" class="botao secundario">Salvar e adicionar outra</button>{% endif %}
-    <a href="{{ url_for('timeline') }}">Cancelar</a>
+    <a href="{{ url_for('timeline', pid=proc.id) }}">Cancelar</a>
   </div>
 </form>
 
 {% if editing %}
-<form method="post" action="{{ url_for('delete', eid=ev.id) }}" class="excluir"
-      onsubmit="return confirm('Excluir esta prova e seus arquivos? A exclusão fica registrada na auditoria.')">
+<form method="post" action="{{ url_for('delete', pid=proc.id, eid=ev.id) }}" style="margin-top:16px;text-align:right">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <button class="botao perigo">Excluir esta prova</button>
+  <button class="botao perigo" data-confirmar="Excluir esta prova e seus arquivos? A exclusão fica registrada na auditoria.">Excluir esta prova</button>
 </form>
 {% endif %}
+</div>
 {% endblock %}

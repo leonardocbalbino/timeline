@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Pagamentos · Admin{% endblock %}
+{% block content %}
+<div class="cabecalho">
+  <div>
+    <h1>Pagamentos Pix</h1>
+    <p class="sutil" style="margin:4px 0 0">Confira no extrato do seu banco se o valor entrou (o identificador da cobrança aparece na descrição do Pix) e confirme para liberar o Pro.</p>
+  </div>
+  <div class="alternar">
+    {% for k, nome in [('informado', 'Para confirmar'), ('pendente', 'Aguardando pagamento'), ('confirmado', 'Confirmados'), ('todos', 'Todos')] %}
+    <a href="{{ url_for('admin_payments', status=k) }}" class="{{ 'ativo' if status == k }}">{{ nome }}</a>
+    {% endfor %}
+  </div>
+</div>
+<div class="cartao" style="padding:0;overflow:hidden">
+  {% with show_tenant=True %}{% include "admin/_payments_table.html" %}{% endwith %}
+</div>
+{% endblock %}

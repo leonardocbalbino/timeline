@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Clientes · Admin{% endblock %}
+{% block content %}
+<div class="cabecalho">
+  <div>
+    <h1>Clientes</h1>
+    <p class="sutil" style="margin:4px 0 0">Cadastre clientes, defina quem é Free ou Pro e acompanhe o uso.</p>
+  </div>
+  <div class="acoes"><a class="botao" href="{{ url_for('admin_client_new') }}">+ Novo cliente</a></div>
+</div>
+
+{% if not pix_ok %}
+<div class="aviso">O Pix ainda não está configurado: clientes não conseguem assinar o Pro sozinhos. <a href="{{ url_for('admin_plans') }}">Configurar agora</a>.</div>
+{% endif %}
+
+<div class="metricas">
+  <div class="cartao metrica"><b>{{ counts.total }}</b><span>clientes</span></div>
+  <div class="cartao metrica"><b>{{ counts.pro }}</b><span>com Pro ativo</span></div>
+  <div class="cartao metrica"><b>{{ counts.total - counts.pro }}</b><span>no Free</span></div>
+  <a class="cartao metrica {{ 'alerta' if pending }}" href="{{ url_for('admin_payments') }}" style="text-decoration:none;color:inherit">
+    <b>{{ pending }}</b><span>pagamento(s) para confirmar</span></a>
+</div>
+
+<form method="get" class="barra">
+  <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nome, CPF/CNPJ ou e-mail">
+  <button class="botao secundario mini">Buscar</button>
+  {% if q %}<a href="{{ url_for('admin_home') }}" class="pequeno">Limpar</a>{% endif %}
+</form>
+
+<div class="tabela-caixa">
+<table class="tabela">
+  <thead><tr><th>Cliente</th><th>Plano</th><th class="num">Processos</th><th class="num">Espaço</th><th>Último acesso</th><th></th></tr></thead>
+  <tbody>
+  {% for t in tenants %}{% set pl = effective_plan(t) %}
+  <tr>
+    <td><a href="{{ url_for('admin_client', tid=t.id) }}"><strong>{{ t.name }}</strong></a>
+      {% if not t.active %}<span class="selo erro">Desativado</span>{% endif %}
+      <br><small class="sutil">{{ t.email or 'sem login' }}{% if t.document %} · {{ t.document }}{% endif %}</small></td>
+    <td><span class="selo {{ pl }}">{{ PLAN_LABELS[pl] }}</span>
+      {% if t.plan == 'pro' %}<br><small class="sutil">{% if t.pro_until %}{{ 'até' if pl == 'pro' else 'venceu' }} {{ t.pro_until|fmt_date }}{% else %}sem vencimento{% endif %}</small>{% endif %}</td>
+    <td class="num">{{ t.nproc }}</td>
+    <td class="num nowrap">{{ t.bytes|human_size }}</td>
+    <td class="nowrap">{{ t.last_login|fmt_dt if t.last_login else '—' }}</td>
+    <td class="acoes-linha">
+      <a class="botao secundario mini" href="{{ url_for('admin_client', tid=t.id) }}">Editar</a>
+      <form method="post" action="{{ url_for('admin_client_enter', tid=t.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="botao fantasma mini" title="Entrar na conta do cliente (fica na auditoria)">Acessar</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="sutil">Nenhum cliente {{ 'encontrado' if q else 'cadastrado ainda' }}.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
