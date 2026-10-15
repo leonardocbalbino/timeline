@@ -1,22 +1,30 @@
 {% set admin_labels = True %}
+{% set FORMAS = {'PIX': 'Pix', 'BOLETO': 'Boleto', 'CREDIT_CARD': 'Cartão', 'UNDEFINED': 'Cliente escolhe'} %}
+{% set TIPOS = {'plano': 'Plano Pro', 'assinatura': 'Assinatura', 'avulsa': 'Avulsa'} %}
 {% if pays %}
 <div class="table-wrap">
 <table class="table">
-  <thead><tr><th>Criada em</th>{% if show_tenant %}<th>Cliente</th>{% endif %}<th class="num">Valor</th><th>Período</th><th>Situação</th><th>Comprovante</th><th><span class="sr-only">Ações</span></th></tr></thead>
+  <thead><tr><th>Criada em</th>{% if show_tenant %}<th>Cliente</th>{% endif %}<th>Cobrança</th><th class="num">Valor</th><th>Situação</th><th>Comprovante / fatura</th><th><span class="sr-only">Ações</span></th></tr></thead>
   <tbody>
   {% for p in pays %}
   <tr>
     <td><span class="mono xsmall">{{ p.created_at|fmt_dt }}</span><div class="subtle mono" style="font-size:11.5px">{{ p.txid }}</div></td>
     {% if show_tenant %}<td class="nowrap"><a href="{{ url_for('admin_client', tid=p.tenant_id) }}">{{ p.tenant_name }}</a></td>{% endif %}
-    <td class="num">{{ p.amount_cents|brl }}</td>
-    <td class="nowrap">{{ p.days }} dias</td>
+    <td style="min-width:220px"><span class="chip">{{ TIPOS.get(p.kind, p.kind) }}</span>
+      <div class="subtle xsmall" style="margin-top:4px">{% if p.provider == 'asaas' %}Asaas · {{ FORMAS.get(p.billing_type, p.billing_type) }}{% else %}Pix manual{% endif %}{% if p.days %} · {{ p.days }} dias de Pro{% endif %}</div>
+      {% if p.description and p.kind == 'avulsa' %}<div class="xsmall muted">{{ p.description }}</div>{% endif %}</td>
+    <td class="num">{{ p.amount_cents|brl }}{% if p.due_date %}<div class="subtle xsmall">vence <span class="mono">{{ p.due_date|fmt_date }}</span></div>{% endif %}</td>
     <td>{% include "_pay_status.html" %}
       {% if p.informed_at %}<div class="subtle xsmall" style="margin-top:4px">informado <span class="mono">{{ p.informed_at|fmt_dt }}</span></div>{% endif %}
-      {% if p.decided_by %}<div class="subtle xsmall">por {{ p.decided_by }} em <span class="mono">{{ p.decided_at|fmt_dt }}</span></div>{% endif %}
+      {% if p.paid_at %}<div class="subtle xsmall" style="margin-top:4px">pago <span class="mono">{{ p.paid_at|fmt_dt }}</span></div>
+      {% elif p.decided_by %}<div class="subtle xsmall">por {{ p.decided_by }} em <span class="mono">{{ p.decided_at|fmt_dt }}</span></div>{% endif %}
       {% if p.note %}<div class="xsmall muted">“{{ p.note }}”</div>{% endif %}</td>
-    <td>{% if p.receipt_stored %}<a href="{{ url_for('admin_payment_receipt', pay_id=p.id) }}" target="_blank" rel="noopener" title="{{ p.receipt_name }}">Ver</a>{% else %}<span class="subtle">—</span>{% endif %}</td>
+    <td>{% if p.receipt_stored %}<a href="{{ url_for('admin_payment_receipt', pay_id=p.id) }}" target="_blank" rel="noopener" title="{{ p.receipt_name }}">Ver comprovante</a>
+      {% elif p.invoice_url %}<a href="{{ p.invoice_url }}" target="_blank" rel="noopener" class="row" style="gap:4px;display:inline-flex">Fatura {{ icon('external', 14) }}</a>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-copiar-texto="{{ p.invoice_url }}" aria-label="Copiar link da fatura">{{ icon('copy', 14) }}</button>
+      {% else %}<span class="subtle">—</span>{% endif %}</td>
     <td><div class="actions">
-      {% if p.status in ('pendente', 'informado') %}
+      {% if p.provider == 'manual' and p.status in ('pendente', 'informado') %}
       <form method="post" action="{{ url_for('admin_payment_decide', pay_id=p.id, acao='confirmar') }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <button class="btn btn-primary btn-sm" data-confirmar="Confirmar o recebimento de {{ p.amount_cents|brl }} e liberar {{ p.days }} dias de Pro?">{{ icon('check', 16) }}Confirmar</button>
@@ -25,6 +33,17 @@
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <button class="btn btn-ghost btn-sm" data-confirmar="Recusar este pagamento?">Recusar</button>
       </form>
+      {% elif p.provider == 'asaas' %}
+      <form method="post" action="{{ url_for('admin_payment_sync', pay_id=p.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-secondary btn-sm" title="Consultar o status no Asaas">Atualizar</button>
+      </form>
+      {% if p.status in ('pendente', 'vencido') and p.kind != 'assinatura' %}
+      <form method="post" action="{{ url_for('admin_payment_cancel', pay_id=p.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost btn-sm" data-confirmar="Cancelar esta cobrança no Asaas?">Cancelar</button>
+      </form>
+      {% endif %}
       {% endif %}
     </div></td>
   </tr>

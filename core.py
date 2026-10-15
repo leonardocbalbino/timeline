@@ -70,7 +70,7 @@ DEFAULT_PLANS = {
 }
 DEFAULT_SETTINGS = {"pix_chave": "", "pix_nome": "", "pix_cidade": "",
                     "pro_preco": "49.90", "pro_dias": "30", "planos": "",
-                    "autocadastro": "1", "contato_email": ""}
+                    "autocadastro": "1", "contato_email": "", "gateway": "manual"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenants (
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS payments (
     txid TEXT NOT NULL UNIQUE,
     amount_cents INTEGER NOT NULL,
     days INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pendente',  -- pendente | informado | confirmado | recusado | cancelado
+    status TEXT NOT NULL DEFAULT 'pendente',  -- pendente | informado | confirmado | vencido | estornado | recusado | cancelado
     created_at TEXT NOT NULL,
     informed_at TEXT,
     decided_at TEXT,
@@ -157,6 +157,29 @@ CREATE TABLE IF NOT EXISTS payments (
     receipt_stored TEXT,
     receipt_name TEXT,
     note TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL DEFAULT 'asaas',
+    external_id TEXT UNIQUE,
+    status TEXT NOT NULL DEFAULT 'ativa',      -- ativa | inativa | cancelada
+    months INTEGER NOT NULL,
+    days INTEGER NOT NULL,                      -- dias de Pro liberados a cada cobrança paga
+    value_cents INTEGER NOT NULL,
+    billing_type TEXT NOT NULL,
+    next_due_date TEXT,
+    created_at TEXT NOT NULL,
+    canceled_at TEXT,
+    canceled_by TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS webhook_events (
+    id TEXT PRIMARY KEY,                        -- id do evento no Asaas (idempotência)
+    event TEXT NOT NULL,
+    resource_id TEXT,
+    received_at TEXT NOT NULL,
+    error TEXT NOT NULL DEFAULT '',
+    payload TEXT NOT NULL
 );
 """
 
@@ -168,6 +191,8 @@ CREATE INDEX IF NOT EXISTS idx_files_hash ON files(sha256);
 CREATE INDEX IF NOT EXISTS idx_proc_tenant ON processes(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit(tenant_id, id);
 CREATE INDEX IF NOT EXISTS idx_pay_tenant ON payments(tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pay_external ON payments(external_id);
+CREATE INDEX IF NOT EXISTS idx_sub_tenant ON subscriptions(tenant_id, id);
 """
 
 
@@ -213,6 +238,17 @@ def init_db():
         conn.execute("ALTER TABLE audit ADD COLUMN tenant_id INTEGER")
     if "user_email" not in audit_cols:
         conn.execute("ALTER TABLE audit ADD COLUMN user_email TEXT NOT NULL DEFAULT ''")
+    pay_cols = cols("payments")
+    for col, ddl in (("provider", "TEXT NOT NULL DEFAULT 'manual'"),   # manual | asaas
+                     ("kind", "TEXT NOT NULL DEFAULT 'plano'"),       # plano | assinatura | avulsa
+                     ("external_id", "TEXT"), ("subscription_id", "INTEGER"),
+                     ("billing_type", "TEXT NOT NULL DEFAULT 'PIX'"), ("invoice_url", "TEXT"),
+                     ("due_date", "TEXT"), ("description", "TEXT NOT NULL DEFAULT ''"),
+                     ("paid_at", "TEXT"), ("synced_at", "TEXT")):
+        if col not in pay_cols:
+            conn.execute(f"ALTER TABLE payments ADD COLUMN {col} {ddl}")
+    if "asaas_customer_id" not in cols("tenants"):
+        conn.execute("ALTER TABLE tenants ADD COLUMN asaas_customer_id TEXT")
     conn.executescript(INDEXES)
 
     # Provas da versão anterior vão para uma conta "Conta principal" (Pro sem vencimento).
@@ -407,6 +443,26 @@ def has_feature(name, t=None):
     return t is not None and name in plan_cfg(t)["features"]
 
 
+def grant_pro(tenant_id, days):
+    """Soma dias de Pro a partir do vencimento atual (ou de hoje, se já venceu). Retorna o novo vencimento."""
+    t = db().execute("SELECT * FROM tenants WHERE id=?", (tenant_id,)).fetchone()
+    if not t or days <= 0:
+        return t["pro_until"] if t else None
+    if t["plan"] == "pro" and not t["pro_until"]:
+        return None  # já é Pro sem vencimento
+    base = t["pro_until"] if effective_plan(t) == "pro" and t["pro_until"] else today()
+    until = add_days(base, days)
+    db().execute("UPDATE tenants SET plan='pro', pro_until=? WHERE id=?", (until, tenant_id))
+    return until
+
+
+def revoke_pro(tenant_id, days):
+    """Desfaz dias de Pro de um pagamento estornado (não mexe em Pro sem vencimento)."""
+    t = db().execute("SELECT * FROM tenants WHERE id=?", (tenant_id,)).fetchone()
+    if t and t["plan"] == "pro" and t["pro_until"] and days > 0:
+        db().execute("UPDATE tenants SET pro_until=? WHERE id=?", (add_days(t["pro_until"], -days), tenant_id))
+
+
 def storage_used(tenant_id):
     return db().execute("SELECT COALESCE(SUM(f.size), 0) FROM files f "
                         "JOIN evidences e ON e.id = f.evidence_id "
@@ -478,7 +534,7 @@ def csrf_token():
 
 @app.before_request
 def check_csrf():
-    if request.method == "POST" and request.endpoint != "login":
+    if request.method == "POST" and request.endpoint not in ("login", "asaas_webhook"):
         if request.form.get("csrf") != session.get("csrf"):
             abort(400, "Token de segurança inválido. Recarregue a página.")
 

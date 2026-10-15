@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}?v=6">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% set ep = request.endpoint or '' %}
@@ -100,6 +100,6 @@
   <button type="button" class="lb-btn lb-next" aria-label="Próxima imagem">{{ icon('chevron-right', 20) }}</button>
   <div class="lb-caption"></div>
 </div>
-<script src="{{ url_for('static', filename='app.js') }}?v=6"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=7"></script>
 </body>
 </html>

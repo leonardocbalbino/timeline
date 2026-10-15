@@ -24,7 +24,7 @@
   <div class="form-grid">
     <label>Nome ou razão social <input type="text" name="nome" value="{{ t.name or '' }}" required maxlength="200"></label>
     <label>E-mail de login <input type="email" name="email" value="{{ user.email if user else (t.email or '') }}" {{ 'required' if not editing }} maxlength="200" autocomplete="off"></label>
-    <label>CPF / CNPJ <span class="hint">opcional</span><input type="text" name="documento" value="{{ t.document or '' }}" maxlength="30" style="font-family:var(--font-mono)"></label>
+    <label>CPF / CNPJ <span class="hint">exigido para cobrar pelo Asaas</span><input type="text" name="documento" value="{{ t.document or '' }}" maxlength="30" style="font-family:var(--font-mono)"></label>
     <label>Telefone <span class="hint">opcional</span><input type="text" name="telefone" value="{{ t.phone or '' }}" maxlength="30"></label>
     {% if not editing %}
     <label class="full">Senha inicial <span class="hint">deixe em branco para gerar uma senha forte automaticamente</span>
@@ -84,7 +84,55 @@
   {% endif %}
 </section>
 
+{% if gateway == 'asaas' %}
+<section class="card card-lg stack" id="cobranca">
+  <h2>Nova cobrança avulsa</h2>
+  {% if not doc_ok %}
+  <div class="alert alert-warning" style="margin:0">{{ icon('info') }}<span>Preencha um CPF ou CNPJ válido nos dados acima e salve: o Asaas exige o documento para emitir cobranças.</span></div>
+  {% else %}
+  <form method="post" action="{{ url_for('admin_client_charge', tid=t.id) }}" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <label>Valor (R$) <input type="text" name="valor" required inputmode="decimal" placeholder="150,00" style="font-family:var(--font-mono)"></label>
+      <label>Vencimento <input type="date" name="vencimento" value="{{ default_due }}" required></label>
+      <label class="full">Descrição <span class="hint">aparece na fatura do cliente</span>
+        <input type="text" name="descricao" maxlength="500" placeholder="Ex.: Organização de provas — processo 0001234"></label>
+      <label>Forma de pagamento
+        <select name="forma">{% for k, nome in billing_types.items() %}<option value="{{ k }}" {% if k == 'UNDEFINED' %}selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+      <label>Dias de Pro ao pagar <span class="hint">0 = não mexe no plano</span>
+        <input type="number" name="dias" min="0" value="0" style="font-family:var(--font-mono)"></label>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">{{ icon('plus', 16) }}Gerar cobrança no Asaas</button></div>
+    <p class="subtle small">O Asaas envia a fatura ao e-mail do cliente. O link também fica na lista de pagamentos abaixo para você mandar por WhatsApp.</p>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if subs %}
 <section class="card card-flush">
+  <div class="card-head"><h2>Assinaturas</h2></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Criada em</th><th>Ciclo</th><th class="num">Valor</th><th>Forma</th><th>Situação</th><th><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>{% for sb in subs %}
+    <tr>
+      <td><span class="mono xsmall">{{ sb.created_at|fmt_dt }}</span><div class="subtle mono" style="font-size:11.5px">{{ sb.external_id }}</div></td>
+      <td>{{ {1: 'Mensal', 3: 'Trimestral', 6: 'Semestral', 12: 'Anual'}.get(sb.months, sb.months ~ ' meses') }}<div class="subtle xsmall">{{ sb.days }} dias de Pro por pagamento</div></td>
+      <td class="num">{{ sb.value_cents|brl }}</td>
+      <td>{{ billing_types.get(sb.billing_type, sb.billing_type) }}</td>
+      <td>{% if sb.status == 'ativa' %}<span class="chip chip-verified">Ativa</span>{% if sb.next_due_date %}<div class="subtle xsmall">próxima <span class="mono">{{ sb.next_due_date|fmt_date }}</span></div>{% endif %}
+        {% else %}<span class="chip">{{ sb.status|capitalize }}</span>{% if sb.canceled_at %}<div class="subtle xsmall"><span class="mono">{{ sb.canceled_at|fmt_dt }}</span> · {{ sb.canceled_by }}</div>{% endif %}{% endif %}</td>
+      <td><div class="actions">{% if sb.status == 'ativa' %}
+        <form method="post" action="{{ url_for('admin_subscription_cancel', sid=sb.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" data-confirmar="Cancelar a assinatura no Asaas? Não haverá novas cobranças.">Cancelar</button></form>{% endif %}</div></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="card card-flush" id="pagamentos">
   <div class="card-head"><h2>Pagamentos</h2></div>
   {% with show_tenant=False, empty_text='Nenhum pagamento deste cliente.' %}{% include "admin/_payments_table.html" %}{% endwith %}
 </section>

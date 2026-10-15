@@ -41,8 +41,21 @@
     <p class="subtle small">O cliente pode pagar 1, 3, 6 ou 12 períodos de uma vez.</p>
   </section>
 
+  <section class="card card-lg stack" id="gateway">
+    <h2>Como receber</h2>
+    <div class="segmented" role="radiogroup" aria-label="Gateway de pagamento" style="align-self:flex-start">
+      <label class="seg-opt"><input type="radio" name="gateway" value="manual" {% if s.gateway != 'asaas' %}checked{% endif %}>Pix manual</label>
+      <label class="seg-opt"><input type="radio" name="gateway" value="asaas" {% if s.gateway == 'asaas' %}checked{% endif %}>Asaas (automático)</label>
+    </div>
+    <p class="subtle small"><strong>Pix manual:</strong> o cliente paga na sua chave e você confirma em Pagamentos.
+      <strong>Asaas:</strong> assinatura recorrente ou pagamento único por Pix, boleto ou cartão, com liberação automática do Pro.</p>
+    {% if s.gateway == 'asaas' and not asaas_ok %}
+    <div class="alert alert-warning" style="margin:0">{{ icon('alert') }}<span>O Asaas está selecionado, mas a chave da API não está no servidor. Enquanto isso, os clientes veem o Pix manual.</span></div>
+    {% endif %}
+  </section>
+
   <section class="card card-lg stack">
-    <h2>Recebimento via Pix</h2>
+    <h2>Pix manual</h2>
     <label>Chave Pix
       <input type="text" name="pix_chave" value="{{ s.pix_chave }}" placeholder="CPF/CNPJ, e-mail, +5511999999999 ou chave aleatória" style="font-family:var(--font-mono)">
       <span class="hint">Telefone com +55 e DDD. CPF/CNPJ pode ter pontos e traços: eles são removidos.</span></label>
@@ -66,4 +79,48 @@
 
   <div class="form-actions"><button class="btn btn-primary">{{ icon('check') }}Salvar</button></div>
 </form>
+
+<section class="card card-lg stack" style="margin-top:var(--s-6)" id="asaas">
+  <div class="row-between"><h2>Asaas</h2>
+    {% if asaas_ok %}<span class="chip chip-verified">{{ icon('check', 14) }}Chave configurada · {{ asaas_env }}</span>
+    {% else %}<span class="chip chip-danger">Sem chave da API</span>{% endif %}</div>
+  {% if not asaas_ok %}
+  <p class="muted">As credenciais ficam no servidor, fora do banco e do Git. No arquivo <code>/opt/timeline/.env</code>, preencha:</p>
+  <pre class="hash-full" style="background:var(--bg);padding:12px 16px;border-radius:var(--r-md);margin:0;color:var(--ink)">ASAAS_API_KEY=$aact_...      (Asaas › Integrações › Chave de API)
+ASAAS_ENV=sandbox            (ou production)
+ASAAS_WEBHOOK_TOKEN=...      (já gerado pelo deploy)</pre>
+  <p class="subtle small">Depois rode <code>sh /opt/timeline/deploy/deploy.sh</code> (ou <code>systemctl restart timeline</code>) para carregar.</p>
+  {% else %}
+  <div class="row">
+    <form method="post" action="{{ url_for('admin_asaas_test') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="btn btn-secondary">{{ icon('check', 16) }}Testar conexão</button></form>
+  </div>
+  {% endif %}
+
+  <h3 style="margin-top:var(--s-3)">Webhook</h3>
+  <p class="muted small">É por aqui que o Asaas avisa os pagamentos. Endereço: <code>{{ hook_url }}</code>
+    {% if hook_token_ok %}<span class="chip chip-verified" style="margin-left:6px">token definido</span>{% else %}<span class="chip chip-danger" style="margin-left:6px">ASAAS_WEBHOOK_TOKEN ausente</span>{% endif %}</p>
+  {% if asaas_ok %}
+  <form method="post" action="{{ url_for('admin_asaas_webhook') }}" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label class="sr-only" for="hook-email">E-mail para avisos de falha</label>
+    <input type="email" id="hook-email" name="email" value="{{ admin_email }}" placeholder="E-mail para avisos de falha" required style="flex:1 1 260px;width:auto">
+    <button class="btn btn-primary">{{ icon('link', 16) }}Configurar webhook no Asaas</button>
+  </form>
+  {% endif %}
+
+  {% if hooks %}
+  <h3 style="margin-top:var(--s-3)">Últimos eventos recebidos</h3>
+  <div class="card card-flush">
+    <table class="table">
+      <thead><tr><th>Recebido</th><th>Evento</th><th>Recurso</th><th>Resultado</th></tr></thead>
+      <tbody>{% for e in hooks %}
+        <tr><td class="mono xsmall">{{ e.received_at|fmt_dt }}</td><td><span class="chip">{{ e.event }}</span></td>
+          <td class="mono xsmall">{{ e.resource_id or '—' }}</td>
+          <td class="xsmall">{% if e.error %}<span style="color:var(--danger)">{{ e.error }}</span>{% else %}<span class="subtle">ok</span>{% endif %}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
 {% endblock %}

@@ -618,3 +618,8 @@ audio { width: 100%; }
   .lp-demo .tl-item { grid-template-columns: 40px 20px minmax(0, 1fr); gap: 0 var(--s-2); }
   .lp-demo .player-time { font-size: 11px; }
 }
+.segmented .seg-opt { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 12px; border-radius: var(--r-sm);
+  font: 600 14px var(--font-body); color: var(--text-muted); cursor: pointer; position: relative; }
+.segmented .seg-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.segmented .seg-opt:has(input:checked) { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(14,26,43,.12); }
+.segmented .seg-opt:has(input:focus-visible) { outline: 2px solid var(--action); outline-offset: 2px; }

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Pagamento{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('plan') }}">Plano</a><span>/</span><span>Pagamento</span></nav>
+<div class="page-head">
+  <div>
+    <h1>{{ pay.description or 'Pagamento' }}</h1>
+    <div class="meta-line">{% set p = pay %}{% include "_pay_status.html" %}
+      <span>{{ billing_types.get(pay.billing_type, pay.billing_type) }}</span>
+      {% if pay.due_date %}<span>vence em <span class="mono">{{ pay.due_date|fmt_date }}</span></span>{% endif %}
+      {% if pay.kind == 'assinatura' %}<span class="chip">Assinatura</span>{% endif %}</div>
+  </div>
+</div>
+
+<div class="card card-lg {{ 'pix' if qr }}" data-status-url="{{ url_for('payment_status', pay_id=pay.id) if pay.status in ('pendente', 'vencido') }}">
+  {% if qr %}<div><div class="pix-qr"><img src="data:image/png;base64,{{ qr.encodedImage }}" alt="QR Code Pix de {{ pay.amount_cents|brl }}"></div></div>{% endif %}
+  <div class="stack-lg">
+    <div>
+      <div class="pix-amount">{{ pay.amount_cents|brl }}</div>
+      {% if pay.days %}<p class="subtle" style="margin-top:6px">Libera {{ pay.days }} dias de Pro assim que o pagamento for confirmado.</p>{% endif %}
+    </div>
+
+    {% if pay.status == 'confirmado' %}
+      <div class="alert alert-ok" style="margin:0">{{ icon('check') }}<span>Pagamento confirmado em <span class="mono">{{ pay.paid_at|fmt_dt }}</span>.{% if pay.days %} Seu plano Pro está ativo.{% endif %}</span></div>
+    {% elif pay.status in ('cancelado', 'estornado') %}
+      <div class="alert alert-erro" style="margin:0">{{ icon('alert') }}<span>Esta cobrança foi {{ 'cancelada' if pay.status == 'cancelado' else 'estornada' }}. <a href="{{ url_for('plan') }}">Voltar ao plano</a>.</span></div>
+    {% else %}
+      {% if pay.status == 'vencido' %}<div class="alert alert-warning" style="margin:0">{{ icon('clock') }}<span>A cobrança venceu, mas ainda pode ser paga pela fatura.</span></div>{% endif %}
+      {% if qr %}
+        <ol class="steps">
+          <li>No app do banco, escolha <strong>Pix › Ler QR Code</strong> ou <strong>Pix Copia e Cola</strong>.</li>
+          <li>Confira o valor e conclua o pagamento.</li>
+          <li>Pronto: esta página confirma sozinha em alguns segundos.</li>
+        </ol>
+        <label>Pix copia e cola
+          <span class="copy-field"><input type="text" readonly value="{{ qr.payload }}" id="pix-codigo">
+            <button type="button" class="btn btn-secondary" data-copiar="pix-codigo">{{ icon('copy', 16) }}Copiar</button></span></label>
+      {% else %}
+        <p class="muted">{% if pay.billing_type == 'CREDIT_CARD' %}Pague com cartão de crédito na fatura segura do Asaas.{% if pay.kind == 'assinatura' %} As próximas cobranças da assinatura são feitas automaticamente no mesmo cartão.{% endif %}
+          {% elif pay.billing_type == 'BOLETO' %}Abra a fatura para ver e pagar o boleto. A confirmação do boleto leva até 3 dias úteis.
+          {% else %}Abra a fatura e escolha como pagar: Pix, boleto ou cartão.{% endif %}</p>
+      {% endif %}
+      <div class="form-actions">
+        {% if pay.invoice_url %}<a class="btn {{ 'btn-secondary' if qr else 'btn-primary' }}" href="{{ pay.invoice_url }}" target="_blank" rel="noopener">{{ icon('external', 16) }}Abrir fatura</a>{% endif %}
+        <form method="post"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn btn-secondary" name="acao" value="verificar">{{ icon('check', 16) }}Já paguei — verificar</button></form>
+        {% if pay.kind != 'assinatura' %}
+        <form method="post"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost" name="acao" value="cancelar" data-confirmar="Cancelar esta cobrança?">Cancelar cobrança</button></form>
+        {% endif %}
+      </div>
+      <p class="subtle small" data-status-msg>{{ icon('clock', 14) }} Aguardando a confirmação do Asaas…</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

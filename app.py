@@ -19,6 +19,8 @@ from core import (DATA, UPLOADS, app, audit, client_ip, db, effective_plan, feat
                   now, parse_dt, password_fingerprint, plan_cfg, plans, process_count, quota_left,
                   serve_upload, setting, slug, storage_used, store_upload, tenant_required, today,
                   unlink_upload)
+import asaas
+import billing
 import pix
 
 # ---------------------------------------------------------------- login
@@ -653,47 +655,48 @@ def share_file(token, fid):
     return serve_upload(f["stored_name"], f["mime"], f["original_name"], download)
 
 
-# ---------------------------------------------------------------- plano e pagamento Pix
+# ---------------------------------------------------------------- plano e pagamento
 @app.route("/plano")
 @tenant_required
 def plan():
-    pays = db().execute("SELECT * FROM payments WHERE tenant_id=? ORDER BY id DESC LIMIT 20",
-                        (g.tenant["id"],)).fetchall()
+    tid = g.tenant["id"]
+    pays = db().execute("SELECT * FROM payments WHERE tenant_id=? ORDER BY id DESC LIMIT 20", (tid,)).fetchall()
     return render_template("plan.html", plans=plans(), current=effective_plan(g.tenant),
                            price=_pro_price_cents(), days=_pro_days(), pays=pays,
-                           pix_ok=bool(setting("pix_chave")), used=storage_used(g.tenant["id"]),
-                           nproc=process_count(g.tenant["id"]))
+                           pix_ok=bool(setting("pix_chave")), used=storage_used(tid),
+                           nproc=process_count(tid), gateway=billing.gateway(),
+                           sub=billing.active_subscription(tid), billing_types=asaas.BILLING_TYPES,
+                           doc_ok=billing.valid_cpf_cnpj(g.tenant["document"]))
 
 
 def _pro_price_cents():
-    try:
-        return round(float(setting("pro_preco").replace(",", ".")) * 100)
-    except ValueError:
-        return 0
+    return billing.pro_price_cents()
 
 
 def _pro_days():
-    try:
-        return max(1, int(setting("pro_dias")))
-    except ValueError:
-        return 30
+    return billing.days_for(1)
 
 
 PERIODOS = (1, 3, 6, 12)
 
 
+def _periodos():
+    try:
+        n = int(request.form.get("periodos", "1"))
+    except ValueError:
+        n = 1
+    return n if n in PERIODOS else 1
+
+
 @app.route("/plano/pix", methods=["POST"])
 @tenant_required
 def plan_pix():
+    if billing.gateway() == "asaas":
+        return redirect(url_for("plan"))
     if not setting("pix_chave") or not _pro_price_cents():
         flash("Pagamento via Pix ainda não está configurado. Fale com o administrador.", "erro")
         return redirect(url_for("plan"))
-    try:
-        periodos = int(request.form.get("periodos", "1"))
-    except ValueError:
-        periodos = 1
-    if periodos not in PERIODOS:
-        periodos = 1
+    periodos = _periodos()
     txid = f"TL{g.tenant['id']}X{secrets.token_hex(8).upper()}"[:25]
     cur = db().execute("INSERT INTO payments(tenant_id, txid, amount_cents, days, created_at) "
                        "VALUES (?,?,?,?,?)",
@@ -704,6 +707,50 @@ def plan_pix():
     return redirect(url_for("payment", pay_id=cur.lastrowid))
 
 
+@app.route("/plano/asaas", methods=["POST"])
+@tenant_required
+def plan_asaas():
+    """Assinatura recorrente ou pagamento único do Pro pelo Asaas (Pix, boleto ou cartão)."""
+    if billing.gateway() != "asaas":
+        return redirect(url_for("plan"))
+    tid = g.tenant["id"]
+    doc = request.form.get("documento", "").strip()
+    if doc:
+        if not billing.valid_cpf_cnpj(doc):
+            flash("CPF ou CNPJ inválido.", "erro")
+            return redirect(url_for("plan"))
+        digits = billing.only_digits(doc)
+        db().execute("UPDATE tenants SET document=?, asaas_customer_id=NULL WHERE id=? AND document!=?",
+                     (digits, tid, digits))
+        db().commit()
+    periodos, forma = _periodos(), request.form.get("forma", "PIX")
+    try:
+        if request.form.get("modalidade") == "assinatura":
+            _sid, first = billing.create_subscription(tid, periodos, forma)
+            flash("Assinatura criada. A cada cobrança paga, o Pro é renovado automaticamente.", "ok")
+        else:
+            first = billing.create_charge(tid, _pro_price_cents() * periodos, _pro_days() * periodos, "plano",
+                                          f"Íntegra Pro — {_pro_days() * periodos} dias", forma)
+            audit("asaas_cobranca_criada", f"pagamento #{first['id']} {first['external_id']} plano {periodos}x")
+    except (billing.BillingError, asaas.AsaasError) as e:
+        flash(str(e), "erro")
+        return redirect(url_for("plan"))
+    return redirect(url_for("payment", pay_id=first["id"]) if first else url_for("plan"))
+
+
+@app.route("/plano/assinatura/cancelar", methods=["POST"])
+@tenant_required
+def plan_cancel_subscription():
+    sub = billing.active_subscription(g.tenant["id"])
+    if sub:
+        try:
+            billing.cancel_subscription(sub, g.user["email"])
+            flash("Assinatura cancelada. O Pro continua até o fim do período já pago.", "ok")
+        except billing.BillingError as e:
+            flash(str(e), "erro")
+    return redirect(url_for("plan"))
+
+
 def get_payment(pay_id):
     p = db().execute("SELECT * FROM payments WHERE id=? AND tenant_id=?",
                      (pay_id, g.tenant["id"])).fetchone()
@@ -712,10 +759,19 @@ def get_payment(pay_id):
     return p
 
 
+def _sync(pay, force=False):
+    try:
+        return billing.sync_payment(pay, force=force), None
+    except asaas.AsaasError as e:
+        return pay, str(e)
+
+
 @app.route("/plano/pagamento/<int:pay_id>", methods=["GET", "POST"])
 @tenant_required
 def payment(pay_id):
     pay = get_payment(pay_id)
+    if pay["provider"] == "asaas":
+        return _payment_asaas(pay)
     if request.method == "POST" and pay["status"] in ("pendente", "informado"):
         if request.form.get("acao") == "cancelar":
             db().execute("UPDATE payments SET status='cancelado', decided_at=? WHERE id=?",
@@ -742,6 +798,39 @@ def payment(pay_id):
                       pay["amount_cents"] / 100, pay["txid"], "Integra Pro")
     return render_template("payment.html", pay=pay, code=code, qr=pix.qr_svg_data_uri(code),
                            pix_nome=setting("pix_nome"))
+
+
+def _payment_asaas(pay):
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        if acao == "cancelar" and pay["kind"] != "assinatura" and pay["status"] in ("pendente", "vencido"):
+            try:
+                billing.cancel_charge(pay, g.user["email"])
+                flash("Cobrança cancelada.", "ok")
+            except billing.BillingError as e:
+                flash(str(e), "erro")
+            return redirect(url_for("plan"))
+        pay, err = _sync(pay, force=True)
+        if err:
+            flash(f"Não foi possível consultar o Asaas agora: {err}", "erro")
+        elif pay["status"] == "confirmado":
+            flash("Pagamento confirmado. Seu plano Pro está ativo.", "ok")
+        else:
+            flash("O Asaas ainda não registrou o pagamento. Pix costuma cair em segundos; "
+                  "boleto, em até 3 dias úteis.", "erro")
+        return redirect(url_for("payment", pay_id=pay["id"]))
+    pay, _err = _sync(pay)
+    qr = None
+    if pay["billing_type"] == "PIX" and pay["status"] in ("pendente", "vencido"):
+        qr = billing.pix_qr(pay)
+    return render_template("payment_asaas.html", pay=pay, qr=qr, billing_types=asaas.BILLING_TYPES)
+
+
+@app.route("/plano/pagamento/<int:pay_id>/status")
+@tenant_required
+def payment_status(pay_id):
+    pay, _err = _sync(get_payment(pay_id))
+    return {"status": pay["status"]}
 
 
 @app.route("/plano/pagamento/<int:pay_id>/comprovante")

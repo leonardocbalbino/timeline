@@ -26,11 +26,45 @@
     <ul>{{ limites(plans.free) }}</ul>
   </section>
   <section class="card plan pro {{ 'current' if current == 'pro' }}">
-    <div class="plan-head"><h2>Pro</h2><span class="chip">{{ icon('wallet', 14) }}Pagamento via Pix</span>{% if current == 'pro' %}<span class="chip">Seu plano</span>{% endif %}</div>
+    <div class="plan-head"><h2>Pro</h2><span class="chip">{{ icon('wallet', 14) }}{{ 'Pix, boleto ou cartão' if gateway == 'asaas' else 'Pagamento via Pix' }}</span>{% if current == 'pro' %}<span class="chip">Seu plano</span>{% endif %}</div>
     <div class="price">{{ price|brl }} <small>a cada {{ days }} dias</small></div>
     <ul>{{ limites(plans.pro) }}</ul>
     <div class="plan-cta">
-    {% if pix_ok and price %}
+    {% if gateway == 'asaas' and sub %}
+      <div class="secret" style="margin:0">
+        <div class="row"><span class="badge-pro">Assinatura ativa</span>
+          <span>{{ {1: 'Mensal', 3: 'Trimestral', 6: 'Semestral', 12: 'Anual'}.get(sub.months, sub.months ~ ' meses') }} · <span class="mono">{{ sub.value_cents|brl }}</span> · {{ billing_types.get(sub.billing_type, sub.billing_type) }}</span></div>
+        {% if sub.next_due_date %}<span class="subtle small">Próxima cobrança em <span class="mono">{{ sub.next_due_date|fmt_date }}</span>. Cada pagamento renova o Pro por {{ sub.days }} dias.</span>{% endif %}
+        <form method="post" action="{{ url_for('plan_cancel_subscription') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);padding-left:0" data-confirmar="Cancelar a assinatura? O Pro continua até o fim do período já pago e não haverá novas cobranças.">Cancelar assinatura</button>
+        </form>
+      </div>
+    {% elif gateway == 'asaas' and price %}
+      <form method="post" action="{{ url_for('plan_asaas') }}" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <div class="segmented" role="radiogroup" aria-label="Modalidade">
+          <label class="seg-opt"><input type="radio" name="modalidade" value="assinatura" checked>Assinatura recorrente</label>
+          <label class="seg-opt"><input type="radio" name="modalidade" value="unico">Pagamento único</label>
+        </div>
+        <div class="form-grid">
+          <label>Período
+            <select name="periodos">
+              {% for n, nome in [(1, 'Mensal'), (3, 'Trimestral'), (6, 'Semestral'), (12, 'Anual')] %}<option value="{{ n }}">{{ nome }} · {{ (price * n)|brl }}</option>{% endfor %}
+            </select></label>
+          <label>Forma de pagamento
+            <select name="forma">
+              {% for k in ['PIX', 'CREDIT_CARD', 'BOLETO'] %}<option value="{{ k }}">{{ billing_types[k] }}</option>{% endfor %}
+            </select></label>
+          {% if not doc_ok %}
+          <label class="full">CPF ou CNPJ <span class="hint">exigido pelo Asaas para emitir a cobrança</span>
+            <input type="text" name="documento" required inputmode="numeric" autocomplete="off" style="font-family:var(--font-mono)"></label>
+          {% endif %}
+        </div>
+        <button class="btn btn-primary">{{ 'Renovar' if current == 'pro' else 'Assinar' }} o Pro</button>
+        <p class="subtle small">Na assinatura, a cobrança se repete a cada período e o Pro é renovado sozinho quando o pagamento cai. No cartão, as renovações são automáticas; no Pix e no boleto, a fatura chega por e-mail. Cancele quando quiser.</p>
+      </form>
+    {% elif pix_ok and price %}
       <form method="post" action="{{ url_for('plan_pix') }}" class="row">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
         <label class="sr-only" for="periodos">Período</label>
@@ -57,10 +91,10 @@
     {% for p in pays %}
     <tr>
       <td class="mono xsmall">{{ p.created_at|fmt_dt }}</td>
-      <td>{{ p.days }} dias</td>
+      <td>{{ p.days ~ " dias" if p.days else "—" }}</td>
       <td class="num">{{ p.amount_cents|brl }}</td>
       <td>{% include "_pay_status.html" %}</td>
-      <td class="right">{% if p.status in ('pendente', 'informado') %}<a class="btn btn-secondary btn-sm" href="{{ url_for('payment', pay_id=p.id) }}">Abrir</a>{% endif %}</td>
+      <td class="right">{% if p.status in ('pendente', 'informado', 'vencido') %}<a class="btn btn-secondary btn-sm" href="{{ url_for('payment', pay_id=p.id) }}">Pagar</a>{% else %}<a class="btn btn-ghost btn-sm" href="{{ url_for('payment', pay_id=p.id) }}">Ver</a>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>

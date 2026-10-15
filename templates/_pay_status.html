@@ -1,5 +1,7 @@
 {% if p.status == 'confirmado' %}<span class="chip chip-verified">{{ icon('check', 14) }}Confirmado</span>
 {% elif p.status == 'informado' %}<span class="chip chip-warning">{{ 'Para confirmar' if admin_labels else 'Aguardando confirmação' }}</span>
 {% elif p.status == 'pendente' %}<span class="chip">Aguardando pagamento</span>
+{% elif p.status == 'vencido' %}<span class="chip chip-danger">Vencido</span>
+{% elif p.status == 'estornado' %}<span class="chip chip-danger">Estornado</span>
 {% elif p.status == 'recusado' %}<span class="chip chip-danger">Recusado</span>
 {% else %}<span class="chip">Cancelado</span>{% endif %}

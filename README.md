@@ -67,6 +67,28 @@ Na primeira inicialização, as provas existentes vão para o cliente **“Conta
 `ADMIN_PASSWORD` e use “Acessar” nesse cliente. A senha `VIEWER_PASSWORD` deixa de existir:
 para o advogado, gere um link somente leitura em *Processo e link*.
 
+## Pagamentos pelo Asaas
+
+Em **Admin › Planos e Pix › Como receber**, escolha **Asaas** para:
+
+- **Assinatura recorrente** do Pro (mensal, trimestral, semestral ou anual) por Pix, boleto ou cartão.
+  Cada cobrança paga renova o Pro sozinha; cartão é debitado automaticamente.
+- **Pagamento único** de 1, 3, 6 ou 12 períodos.
+- **Cobrança avulsa** gerada pelo admin na página do cliente (qualquer valor, com ou sem dias de Pro).
+
+Credenciais ficam só no `/opt/timeline/.env` (o deploy já cria as linhas):
+
+```
+ASAAS_API_KEY=$aact_...     # Asaas › Integrações › Chave de API
+ASAAS_ENV=sandbox           # ou production
+ASAAS_WEBHOOK_TOKEN=...     # gerado no deploy (32+ caracteres)
+```
+
+Depois de preencher, rode `sh /opt/timeline/deploy/deploy.sh`, clique em **Testar conexão** e em
+**Configurar webhook no Asaas** (endereço `/webhooks/asaas`). O Pro é liberado pelo webhook; a tela de
+pagamento e o botão **Atualizar** também consultam o Asaas, então nada se perde se um aviso falhar.
+Estornos devolvem os dias liberados. Os clientes precisam de CPF/CNPJ (pedido na hora de pagar).
+
 ## Deploy automático
 
 Cada push no `main` roda `tests/smoke_test.py` no GitHub Actions e, se passar, atualiza o VPS

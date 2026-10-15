@@ -266,6 +266,24 @@
     });
   });
 
+  // ------------------------------------------------------------ pagamento Asaas: confirma sozinho
+  var aguardando = document.querySelector('[data-status-url]');
+  var statusUrl = aguardando && aguardando.getAttribute('data-status-url');
+  if (statusUrl && window.fetch) {
+    var tentativas = 0;
+    var consultar = function () {
+      if (++tentativas > 180) return; // 30 minutos
+      fetch(statusUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j && j.status && j.status !== 'pendente' && j.status !== 'vencido') location.reload();
+          else setTimeout(consultar, 10000);
+        })
+        .catch(function () { setTimeout(consultar, 20000); });
+    };
+    setTimeout(consultar, 8000);
+  }
+
   // ------------------------------------------------------------ formulário de prova
   var form = document.getElementById('form-prova');
   if (!form) return;

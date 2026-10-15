@@ -14,6 +14,10 @@ ADMIN_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)
 ENV
   chmod 600 .env
 fi
+# Asaas: token do webhook gerado aqui; a chave da API (ASAAS_API_KEY) é preenchida à mão no .env
+grep -q '^ASAAS_WEBHOOK_TOKEN=' .env || echo "ASAAS_WEBHOOK_TOKEN=$(openssl rand -hex 24)" >> .env
+grep -q '^ASAAS_ENV=' .env || echo "ASAAS_ENV=sandbox" >> .env
+grep -q '^ASAAS_API_KEY=' .env || echo "ASAAS_API_KEY=" >> .env
 mkdir -p data/uploads
 chown -R timeline:timeline data
 chmod 750 data data/uploads

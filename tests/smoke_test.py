@@ -228,6 +228,189 @@ assert "Criar conta grátis" not in html and "contato@ex.com" in html
 ok(anon3.get("/cadastro"), 302)
 print("landing e autocadastro ok")
 
+# ---------------------------------------------------------------- Asaas (API simulada em memória)
+import asaas  # noqa: E402
+
+FAKE = {"customers": {}, "payments": {}, "subscriptions": {}, "webhooks": {}, "n": 0}
+
+
+def _fake_request(method, path, body=None, params=None):
+    FAKE["n"] += 1
+    n = FAKE["n"]
+    parts = path.strip("/").split("/")
+    if path == "/customers" and method == "POST":
+        if not body.get("cpfCnpj"):
+            raise asaas.AsaasError("O CPF/CNPJ é obrigatório.", 400)
+        c = {"id": f"cus_{n}", **body}
+        FAKE["customers"][c["id"]] = c
+        return c
+    if path == "/payments" and method == "POST":
+        p = {"id": f"pay_{n}", "status": "PENDING", "invoiceUrl": f"https://sandbox.asaas.com/i/{n}",
+             "deleted": False, **body}
+        FAKE["payments"][p["id"]] = p
+        return p
+    if parts[0] == "payments" and len(parts) == 2:
+        p = FAKE["payments"][parts[1]]
+        if method == "DELETE":
+            p["deleted"] = True
+            return {"deleted": True, "id": p["id"]}
+        return dict(p)
+    if parts[0] == "payments" and parts[2] == "pixQrCode":
+        return {"encodedImage": "iVBORw0KGgo=", "payload": "00020126PIXFAKE" + parts[1], "expirationDate": "2030-01-01"}
+    if path == "/subscriptions" and method == "POST":
+        s = {"id": f"sub_{n}", "status": "ACTIVE", **body}
+        FAKE["subscriptions"][s["id"]] = s
+        p = {"id": f"pay_{n}a", "status": "PENDING", "subscription": s["id"], "customer": body["customer"],
+             "value": body["value"], "billingType": body["billingType"], "dueDate": body["nextDueDate"],
+             "invoiceUrl": f"https://sandbox.asaas.com/i/{n}a", "description": body["description"], "deleted": False}
+        FAKE["payments"][p["id"]] = p
+        return s
+    if parts[0] == "subscriptions" and len(parts) == 3:
+        return {"data": [p for p in FAKE["payments"].values() if p.get("subscription") == parts[1]]}
+    if parts[0] == "subscriptions" and len(parts) == 2:
+        if method == "DELETE":
+            FAKE["subscriptions"][parts[1]]["status"] = "INACTIVE"
+            return {"deleted": True}
+        return FAKE["subscriptions"][parts[1]]
+    if path == "/finance/balance":
+        return {"balance": 1234.5}
+    if path == "/webhooks":
+        if method == "GET":
+            return {"data": list(FAKE["webhooks"].values())}
+        w = {"id": f"wh_{n}", **body}
+        FAKE["webhooks"][w["id"]] = w
+        return w
+    raise AssertionError(f"chamada inesperada {method} {path}")
+
+
+asaas._request = _fake_request
+asaas.API_KEY = "teste"
+asaas.WEBHOOK_TOKEN = "t" * 40
+
+
+def rowd(sql, args=()):
+    cur = conn.execute(sql, args)
+    r = cur.fetchone()
+    return dict(zip([c[0] for c in cur.description], r)) if r else None
+
+
+def hook(event, payload, token="t" * 40, eid=None):
+    FAKE["n"] += 1
+    return anon.post("/webhooks/asaas", json={"id": eid or f"evt_{FAKE['n']}", "event": event, **payload},
+                     headers={"asaas-access-token": token})
+
+
+# admin ativa o Asaas e configura o webhook
+form["gateway"] = "asaas"
+form["autocadastro"] = "1"
+ok(adm.post("/admin/planos", data=form), 302)
+html = ok(adm.get("/admin/planos"))
+assert "Chave configurada" in html and "/webhooks/asaas" in html
+assert "Conexão com o Asaas OK" in ok(adm.post("/admin/asaas/testar", data={"csrf": tok}, follow_redirects=True))
+assert "Webhook criado" in ok(adm.post("/admin/asaas/webhook", data={"csrf": tok, "email": "eu@ex.com"},
+                                        follow_redirects=True))
+assert list(FAKE["webhooks"].values())[0]["authToken"] == "t" * 40
+assert "Webhook atualizado" not in ok(adm.get("/admin/planos"))
+
+# cliente novo (Free) assina o Pro: exige CPF válido
+r = adm.post("/admin/clientes/novo", data={"csrf": tok, "nome": "Ana Lima", "email": "ana@ex.com",
+                                           "senha": "senha-ana-123", "plano": "free", "ativo": "1"})
+tid_ana = conn.execute("SELECT id FROM tenants WHERE name='Ana Lima'").fetchone()[0]
+ana = app.test_client()
+login(ana, "ana@ex.com", "senha-ana-123")
+ca = csrf(ana)
+html = ok(ana.get("/plano"))
+assert "Assinatura recorrente" in html and "CPF ou CNPJ" in html
+assert "CPF ou CNPJ inválido" in ok(ana.post("/plano/asaas", data={"csrf": ca, "modalidade": "assinatura", "periodos": "1",
+                                                                     "forma": "PIX", "documento": "111.111.111-11"},
+                                             follow_redirects=True))
+r = ana.post("/plano/asaas", data={"csrf": ca, "modalidade": "assinatura", "periodos": "1", "forma": "PIX",
+                                   "documento": "529.982.247-25"})
+ok(r, 302)
+assert "/plano/pagamento/" in r.headers["Location"], r.headers["Location"]
+html = ok(ana.get(r.headers["Location"]))
+assert "00020126PIXFAKE" in html and "data:image/png;base64" in html and "data-status-url" in html
+sub_ext = conn.execute("SELECT external_id FROM subscriptions WHERE tenant_id=?", (tid_ana,)).fetchone()[0]
+pay_ext = conn.execute("SELECT external_id FROM payments WHERE tenant_id=? AND kind='assinatura'", (tid_ana,)).fetchone()[0]
+assert conn.execute("SELECT document FROM tenants WHERE id=?", (tid_ana,)).fetchone()[0] == "52998224725"
+# segunda assinatura é recusada
+assert "Já existe uma assinatura ativa" in ok(ana.post("/plano/asaas", data={"csrf": ca, "modalidade": "assinatura",
+                                                                              "periodos": "1", "forma": "PIX"},
+                                                       follow_redirects=True))
+
+# webhook: token inválido é recusado; pagamento recebido libera o Pro uma única vez
+assert hook("PAYMENT_RECEIVED", {"payment": {"id": pay_ext}}, token="errado").status_code == 401
+paid = dict(FAKE["payments"][pay_ext], status="RECEIVED")
+FAKE["payments"][pay_ext] = paid
+assert hook("PAYMENT_RECEIVED", {"payment": paid}, eid="evt_pago").status_code == 200
+row = conn.execute("SELECT plan, pro_until FROM tenants WHERE id=?", (tid_ana,)).fetchone()
+assert row[0] == "pro" and row[1], row
+until1 = row[1]
+hook("PAYMENT_RECEIVED", {"payment": paid}, eid="evt_pago")       # mesmo evento repetido
+hook("PAYMENT_CONFIRMED", {"payment": paid})                       # outro evento, mesmo pagamento
+ok(ana.get(f"/plano/pagamento/{conn.execute('SELECT id FROM payments WHERE external_id=?', (pay_ext,)).fetchone()[0]}/status"))
+assert conn.execute("SELECT pro_until FROM tenants WHERE id=?", (tid_ana,)).fetchone()[0] == until1
+assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='asaas_pagamento_confirmado' AND tenant_id=?",
+                    (tid_ana,)).fetchone()[0] == 1
+
+# renovação: nova cobrança da assinatura chega só pelo webhook e soma mais 30 dias
+renov = {"id": "pay_renov", "status": "PENDING", "subscription": sub_ext, "customer": paid["customer"], "value": 49.9,
+         "billingType": "PIX", "dueDate": "2030-01-01", "invoiceUrl": "https://x/i/renov"}
+FAKE["payments"]["pay_renov"] = renov
+hook("PAYMENT_CREATED", {"payment": renov})
+assert conn.execute("SELECT status, days FROM payments WHERE external_id='pay_renov'").fetchone() == ("pendente", 30)
+hook("PAYMENT_RECEIVED", {"payment": dict(renov, status="RECEIVED")})
+until2 = conn.execute("SELECT pro_until FROM tenants WHERE id=?", (tid_ana,)).fetchone()[0]
+from datetime import date  # noqa: E402
+assert (date.fromisoformat(until2) - date.fromisoformat(until1)).days == 30, (until1, until2)
+# estorno devolve os dias
+hook("PAYMENT_REFUNDED", {"payment": dict(renov, status="REFUNDED")})
+assert conn.execute("SELECT pro_until FROM tenants WHERE id=?", (tid_ana,)).fetchone()[0] == until1
+assert conn.execute("SELECT status FROM payments WHERE external_id='pay_renov'").fetchone()[0] == "estornado"
+# evento de cliente desconhecido fica registrado sem erro
+assert hook("PAYMENT_RECEIVED", {"payment": {"id": "pay_x", "customer": "cus_x", "status": "RECEIVED"}}).status_code == 200
+
+# cliente cancela a assinatura
+html = ok(ana.get("/plano"))
+assert "Assinatura ativa" in html
+ok(ana.post("/plano/assinatura/cancelar", data={"csrf": ca}), 302)
+assert conn.execute("SELECT status FROM subscriptions WHERE external_id=?", (sub_ext,)).fetchone()[0] == "cancelada"
+assert FAKE["subscriptions"][sub_ext]["status"] == "INACTIVE"
+assert "Assinatura recorrente" in ok(ana.get("/plano"))
+
+# pagamento único por boleto, confirmado pela sincronização (sem webhook)
+r = ana.post("/plano/asaas", data={"csrf": ca, "modalidade": "unico", "periodos": "3", "forma": "BOLETO"})
+ok(r, 302)
+html = ok(ana.get(r.headers["Location"]))
+assert "Abrir fatura" in html and "PIXFAKE" not in html
+one = rowd("SELECT * FROM payments WHERE tenant_id=? AND kind='plano' AND provider='asaas'", (tid_ana,))
+assert one["days"] == 90 and one["amount_cents"] == 14970, dict(one)
+FAKE["payments"][one["external_id"]]["status"] = "CONFIRMED"
+assert "Pagamento confirmado" in ok(ana.post(r.headers["Location"], data={"csrf": ca, "acao": "verificar"},
+                                             follow_redirects=True))
+until3 = conn.execute("SELECT pro_until FROM tenants WHERE id=?", (tid_ana,)).fetchone()[0]
+assert (date.fromisoformat(until3) - date.fromisoformat(until1)).days == 90
+
+# admin gera cobrança avulsa sem dias de Pro, depois cancela
+html = ok(adm.get(f"/admin/clientes/{tid_ana}"))
+assert "Nova cobrança avulsa" in html and "Assinaturas" in html
+r = adm.post(f"/admin/clientes/{tid_ana}/cobranca", data={"csrf": tok, "valor": "1.250,00", "descricao": "Consultoria",
+                                                          "vencimento": "2030-01-10", "forma": "UNDEFINED", "dias": "0"},
+             follow_redirects=True)
+assert "Cobrança criada" in ok(r)
+av = rowd("SELECT * FROM payments WHERE tenant_id=? AND kind='avulsa' AND description='Consultoria'", (tid_ana,))
+assert av["amount_cents"] == 125000 and av["due_date"] == "2030-01-10" and av["days"] == 0
+assert "Fatura" in ok(adm.get("/admin/pagamentos?status=pendente"))
+assert "pelo menos R$ 5,00" in ok(adm.post(f"/admin/clientes/{tid_ana}/cobranca", data={"csrf": tok, "valor": "2", "forma": "PIX"},
+                                           follow_redirects=True))
+ok(adm.post(f"/admin/pagamentos/{av['id']}/cancelar", data={"csrf": tok}), 302)
+assert conn.execute("SELECT status FROM payments WHERE id=?", (av["id"],)).fetchone()[0] == "cancelado"
+# confirmar manualmente não vale para o Asaas
+ok(adm.post(f"/admin/pagamentos/{one['id']}/confirmar", data={"csrf": tok}), 302)
+html = ok(adm.get("/admin/planos"))
+assert "PAYMENT_RECEIVED" in html
+print("asaas ok")
+
 # trocar senha do admin
 ok(adm.post("/conta", data={"csrf": tok, "atual": "senha-admin-123", "nova": "nova-senha-1", "confirma": "nova-senha-1"}), 302)
 ok(adm.get("/admin"))
