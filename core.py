@@ -1,4 +1,4 @@
-"""Núcleo: configuração, banco de dados, migração, autenticação, planos e utilidades."""
+"""Íntegra — núcleo: configuração, banco de dados, migração, autenticação, planos e utilidades."""
 import hashlib
 import json
 import os
@@ -11,6 +11,7 @@ from functools import wraps
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+from icons import icon
 from flask import (Flask, Response, abort, flash, g, redirect, request, send_file, session,
                    url_for)
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -274,7 +275,9 @@ def human_size(n):
     n = n or 0
     for unit in ["B", "KB", "MB", "GB"]:
         if n < 1024 or unit == "GB":
-            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+            if unit == "B" or n == int(n):
+                return f"{n:.0f} {unit}"
+            return f"{n:.1f} {unit}".replace(".", ",")
         n /= 1024
 
 
@@ -548,6 +551,16 @@ def self_url(**overrides):
     return url_for(request.endpoint, **(request.view_args or {}), **args)
 
 
+def short_hash(h):
+    return f"{h[:4]}…{h[-4:]}" if h and len(h) > 8 else (h or "")
+
+
+def initials(name):
+    parts = [p for p in re.split(r"[\s@._-]+", name or "") if p]
+    return ((parts[0][0] + (parts[1][0] if len(parts) > 1 else "")) if parts else "?").upper()
+
+
+app.jinja_env.filters.update(short_hash=short_hash, initials=initials)
 app.jinja_env.globals.update(csrf_token=csrf_token, has_feature=has_feature, file_url=file_url,
-                             self_url=self_url, effective_plan=effective_plan,
-                             PLAN_LABELS=PLAN_LABELS, FEATURES=FEATURES)
+                             self_url=self_url, effective_plan=effective_plan, plan_cfg=plan_cfg,
+                             icon=icon, PLAN_LABELS=PLAN_LABELS, FEATURES=FEATURES)

@@ -1,23 +1,73 @@
-{% macro media(f, report=False, compact=False) -%}
-<figure class="midia midia-{{ f.kind }}">
-  {% if f.kind == 'imagem' %}
-    <img src="{{ file_url(f.id) }}" alt="{{ f.original_name }}" loading="lazy" class="zoom">
-  {% elif f.kind == 'audio' and not report %}
-    <audio controls preload="none" src="{{ file_url(f.id) }}"></audio>
-  {% elif f.kind == 'video' and not report %}
-    <video controls preload="metadata" playsinline src="{{ file_url(f.id) }}"></video>
-  {% elif not report %}
-    <a class="doc" href="{{ file_url(f.id) }}" target="_blank" rel="noopener">📄 Abrir documento</a>
+{# Componentes de prova: card da linha do tempo, mídia e selo de integridade. #}
+{% set KINDS = {'imagem': ('imagem', 'imagens', 'image'), 'audio': ('áudio', 'áudios', 'mic'),
+                'video': ('vídeo', 'vídeos', 'video'), 'documento': ('documento', 'documentos', 'file')} %}
+
+{% macro integrity(f) -%}
+<div class="integrity">
+  {{ icon('shield-check', 16) }}
+  <div class="integrity-txt">
+    <span title="SHA-256 completo: {{ f.sha256 }}">Íntegro desde o envio · SHA-256 {{ f.sha256|short_hash }}</span>
+    <span class="integrity-file"><a href="{{ file_url(f.id, True) }}" title="Baixar original: {{ f.original_name }}">{{ f.original_name }}</a><span class="subtle">{{ f.size|human_size }}</span></span>
+  </div>
+  <button type="button" class="copy" data-copiar-texto="{{ f.sha256 }}" aria-label="Copiar hash SHA-256 de {{ f.original_name }}">{{ icon('copy', 14) }}</button>
+</div>
+{%- endmacro %}
+
+{% macro media(files, gal) -%}
+  {% set imgs = files|selectattr('kind', 'equalto', 'imagem')|list %}
+  {% if imgs %}
+  <div class="thumbs">
+    {% for f in imgs %}
+    <button type="button" class="thumb {{ 'extra' if loop.index > 4 }}" data-src="{{ file_url(f.id) }}" data-gal="{{ gal }}"
+            data-caption="{{ f.original_name }}" aria-label="Ampliar {{ f.original_name }}">
+      <img src="{{ file_url(f.id) }}" alt="{{ f.original_name }}" loading="lazy">
+      {% if loop.index == 4 and imgs|length > 4 %}<span class="more">+{{ imgs|length - 4 }}</span>{% endif %}
+    </button>
+    {% endfor %}
+  </div>
   {% endif %}
-  <figcaption>
-    <span class="tipo">{{ f.kind }}</span>
-    <a href="{{ file_url(f.id, True) }}" title="Baixar original">{{ f.original_name }}</a>
-    · {{ f.size|human_size }}
-    {% if compact %}
-    <details class="hash-det"><summary>SHA-256</summary><code class="hash">{{ f.sha256 }}</code></details>
+  {% for f in files if f.kind != 'imagem' %}
+    {% if f.kind == 'audio' %}
+      <div class="player" data-player>
+        <audio controls preload="metadata" src="{{ file_url(f.id) }}"></audio>
+        <span class="player-name">{{ f.original_name }}</span>
+      </div>
+    {% elif f.kind == 'video' %}
+      <div class="video"><video controls preload="metadata" playsinline src="{{ file_url(f.id) }}"></video></div>
     {% else %}
-    <code class="hash" title="SHA-256 calculado no envio">SHA-256: {{ f.sha256 }}</code>
+      <a class="doc-link" href="{{ file_url(f.id) }}" target="_blank" rel="noopener">{{ icon('file-text', 18) }}<span>{{ f.original_name }}</span></a>
     {% endif %}
-  </figcaption>
-</figure>
+  {% endfor %}
+{%- endmacro %}
+
+{% macro evidence_card(e, proc, share) -%}
+<article class="card ev-card {{ 'destaque' if e.important }}" id="e{{ e.id }}">
+  <div class="ev-body">
+    <div class="ev-head">
+      <h3>{{ e.title }}</h3>
+      {% if not share %}<a class="btn btn-ghost btn-sm" href="{{ url_for('edit', pid=proc.id, eid=e.id) }}">{{ icon('pencil', 16) }}Editar</a>{% endif %}
+    </div>
+    {% if e.important or e.source or e.people or e.files %}
+    <div class="ev-chips">
+      {% if e.important %}<span class="chip chip-highlight">★ Destaque</span>{% endif %}
+      {% if e.source %}<span class="chip">{{ e.source }}</span>{% endif %}
+      {% for k, (um, varios, ic) in KINDS.items() %}{% set n = e.files|selectattr('kind', 'equalto', k)|list|length %}
+        {% if n %}<span class="chip">{{ icon(ic, 14) }}{{ n }} {{ um if n == 1 else varios }}</span>{% endif %}
+      {% endfor %}
+      {% if e.people %}<span class="chip">{{ icon('users', 14) }}{{ e.people }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if e.description %}<p class="ev-desc">{{ e.description }}</p>{% endif %}
+    {% if e.files %}<div class="media-stack">{{ media(e.files, 'e' ~ e.id) }}</div>{% endif %}
+  </div>
+  {% if e.files %}
+  <div class="ev-foot">
+    {% for f in e.files[:3] %}{{ integrity(f) }}{% endfor %}
+    {% if e.files|length > 3 %}
+    <details class="integrity-more"><summary>Ver os outros {{ e.files|length - 3 }} hashes</summary>
+      {% for f in e.files[3:] %}{{ integrity(f) }}{% endfor %}</details>
+    {% endif %}
+  </div>
+  {% endif %}
+</article>
 {%- endmacro %}

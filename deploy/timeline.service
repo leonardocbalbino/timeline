@@ -1,5 +1,5 @@
 [Unit]
-Description=Linha do Tempo de Provas
+Description=Íntegra (linha do tempo de provas)
 After=network.target
 
 [Service]

@@ -1,7 +1,6 @@
 {% extends "base.html" %}
-{% from "_media.html" import media %}
-{% block title %}{{ proc.title }} · Linha do tempo{% endblock %}
-{% block bodyclass %}{{ 'largo' if modo == 'horizontal' }}{% endblock %}
+{% from "_media.html" import evidence_card %}
+{% block title %}{{ proc.title }}{% endblock %}
 {% block content %}
 {% set horizontal_ok = has_feature('timeline_horizontal') %}
 {% if share %}
@@ -14,125 +13,142 @@
   {% set url_base = url_for('timeline', pid=proc.id) %}
 {% endif %}
 
-<div class="cabecalho">
+{% if not share %}
+<nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('index') }}">Processos</a><span>/</span><span>{{ proc.title }}</span></nav>
+{% endif %}
+<div class="page-head">
   <div>
-    {% if not share %}<div class="trilha"><a href="{{ url_for('index') }}">Processos</a> ›</div>{% endif %}
-    <h1>{{ proc.title }}</h1>
-    <div class="resumo">
-      {% if proc.number %}<code>{{ proc.number }}</code>{% endif %}
-      <span><strong>{{ stats.n }}</strong> registro(s)</span>
-      {% if stats.a %}<span>{{ stats.a|fmt_dt }} → {{ stats.b|fmt_dt }}</span>{% endif %}
-      <span>{{ kinds.get('imagem', 0) }} imagens · {{ kinds.get('audio', 0) }} áudios · {{ kinds.get('video', 0) }} vídeos · {{ kinds.get('documento', 0) }} docs</span>
+    <div class="row">
+      <h1>{{ proc.title }}</h1>
+      {% if not share %}<a class="btn btn-ghost btn-icon btn-sm" href="{{ url_for('process_edit', pid=proc.id) }}" aria-label="Editar dados do processo" title="Editar dados do processo">{{ icon('pencil', 16) }}</a>{% endif %}
     </div>
+    <div class="meta-line">
+      {% if proc.number %}<span class="mono">Proc. {{ proc.number }}</span>{% endif %}
+      <span><strong>{{ stats.n }}</strong> registro{{ 's' if stats.n != 1 }}</span>
+      {% if stats.a %}<span class="mono">{{ stats.a|fmt_date }} → {{ stats.b|fmt_date }}</span>{% endif %}
+      {% set partes = [] %}
+      {% for k, um, varios in [('imagem', 'imagem', 'imagens'), ('audio', 'áudio', 'áudios'), ('video', 'vídeo', 'vídeos'), ('documento', 'documento', 'documentos')] %}
+        {% set n = kinds.get(k, 0) %}{% if n %}{% set _ = partes.append(n ~ ' ' ~ (um if n == 1 else varios)) %}{% endif %}
+      {% endfor %}
+      {% if partes %}<span>{{ partes|join(' · ') }}</span>{% endif %}
+    </div>
+    {% if share and proc.description %}<p class="muted" style="white-space:pre-wrap;margin-top:8px">{{ proc.description }}</p>{% endif %}
   </div>
-  <div class="acoes">
-    {% if has_feature('relatorio') %}<a class="botao secundario" href="{{ url_rel }}">Relatório</a>{% endif %}
-    {% if has_feature('exportar') %}<a class="botao secundario" href="{{ url_zip }}" title="Todos os originais + manifesto com hashes">⬇ ZIP</a>{% endif %}
+  <div class="actions">
+    {% if has_feature('relatorio') %}<a class="btn btn-secondary" href="{{ url_rel }}">{{ icon('file-text') }}Relatório</a>{% endif %}
+    {% if has_feature('exportar') %}<a class="btn btn-secondary" href="{{ url_zip }}" title="Todos os originais + manifesto com os hashes">{{ icon('download') }}Baixar ZIP</a>{% endif %}
     {% if not share %}
-      <a class="botao secundario" href="{{ url_for('process_edit', pid=proc.id) }}">Processo{% if has_feature('compartilhar') %} e link{% endif %}</a>
-      <a class="botao" href="{{ url_for('new', pid=proc.id) }}">+ Nova prova</a>
+      <a class="btn btn-secondary" href="{{ url_for('process_edit', pid=proc.id) }}#compartilhar">{{ icon('share') }}Compartilhar</a>
+      <a class="btn btn-primary" href="{{ url_for('new', pid=proc.id) }}">{{ icon('plus') }}Nova prova</a>
     {% endif %}
   </div>
 </div>
-{% if proc.description and share %}<p class="sutil" style="white-space:pre-wrap;margin-top:-8px">{{ proc.description }}</p>{% endif %}
 
-<form class="barra" method="get">
-  <input type="search" name="q" value="{{ f.q }}" placeholder="Buscar em título, descrição, origem, pessoas">
-  <label>De <input type="date" name="de" value="{{ f.de }}"></label>
-  <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
-  <select name="tipo">
+<form class="card filters" method="get" data-autofiltro role="search">
+  <div class="search">
+    {{ icon('search') }}
+    <label class="sr-only" for="f-q">Buscar</label>
+    <input type="search" id="f-q" name="q" value="{{ f.q }}" placeholder="Buscar em título, descrição, origem, pessoas">
+  </div>
+  <details class="popover" {% if not (f.de or f.ate) %}data-fechar-fora{% endif %}>
+    <summary class="btn btn-secondary">{{ icon('calendar') }}
+      {% if f.de or f.ate %}<span class="mono">{{ f.de|fmt_date or 'início' }} → {{ f.ate|fmt_date or 'hoje' }}</span>{% else %}Período{% endif %}
+      {{ icon('chevron-down', 16) }}</summary>
+    <div class="popover-panel">
+      <label>De <input type="date" name="de" value="{{ f.de }}"></label>
+      <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
+      <div class="form-actions"><button class="btn btn-primary btn-sm">Aplicar</button>
+        {% if f.de or f.ate %}<a class="btn btn-ghost btn-sm" href="{{ self_url(de='', ate='') }}">Limpar período</a>{% endif %}</div>
+    </div>
+  </details>
+  <label class="sr-only" for="f-tipo">Tipo de arquivo</label>
+  <select name="tipo" id="f-tipo">
     <option value="">Todos os tipos</option>
     {% for k, n in [('imagem','Imagens'),('audio','Áudios'),('video','Vídeos'),('documento','Documentos')] %}
     <option value="{{ k }}" {% if f.tipo == k %}selected{% endif %}>{{ n }}</option>
     {% endfor %}
   </select>
-  <label class="check"><input type="checkbox" name="destaque" value="1" {% if f.destaque %}checked{% endif %}> Só destaques</label>
-  <button class="botao secundario mini">Filtrar</button>
-  {% if f.values()|select|list %}<a href="{{ url_base }}" class="pequeno">Limpar</a>{% endif %}
-  <span class="separador"></span>
-  <div class="alternar" role="group" aria-label="Formato da linha do tempo">
-    <a href="{{ self_url(modo='vertical') }}" class="{{ 'ativo' if modo == 'vertical' }}">↕ Vertical</a>
+  <label class="toggle-btn"><input type="checkbox" name="destaque" value="1" {% if f.destaque %}checked{% endif %}>{{ icon('star', 16) }}Só destaques</label>
+  <button class="btn btn-secondary sem-js">{{ icon('filter') }}Filtrar</button>
+  {% if f.values()|select|list %}<a href="{{ url_base }}" class="btn btn-ghost">Limpar</a>{% endif %}
+  <div class="segmented" role="group" aria-label="Formato da linha do tempo" style="margin-left:auto">
+    <a href="{{ self_url(modo='vertical') }}" aria-current="{{ 'true' if modo == 'vertical' else 'false' }}">{{ icon('rows', 16) }}Vertical</a>
     {% if horizontal_ok %}
-      <a href="{{ self_url(modo='horizontal') }}" class="{{ 'ativo' if modo == 'horizontal' }}">↔ Horizontal</a>
+      <a href="{{ self_url(modo='horizontal') }}" aria-current="{{ 'true' if modo == 'horizontal' else 'false' }}">{{ icon('columns', 16) }}Horizontal</a>
     {% elif not share %}
-      <a href="{{ url_for('plan') }}" class="bloqueado" title="Disponível no plano Pro">↔ Horizontal <span class="selo pro">Pro</span></a>
+      <a href="{{ url_for('plan') }}" class="locked bloqueado" title="Disponível no plano Pro">{{ icon('columns', 16) }}Horizontal <span class="badge-pro" style="padding:3px 6px;font-size:10px">Pro</span></a>
     {% endif %}
   </div>
 </form>
 
-{% macro evento_corpo(e, compact) %}
-  <div class="corpo">
-    <header>
-      <h3>{% if e.important %}<span class="estrela" title="Destaque">★</span> {% endif %}{{ e.title }}</h3>
-      {% if not share %}<a class="editar" href="{{ url_for('edit', pid=proc.id, eid=e.id) }}">Editar</a>{% endif %}
-    </header>
-    {% if e.source or e.people %}
-    <p class="meta">
-      {% if e.source %}<span>{{ e.source }}</span>{% endif %}
-      {% if e.people %}<span>Envolvidos: {{ e.people }}</span>{% endif %}
-    </p>
-    {% endif %}
-    {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
-    {% if e.files %}
-    <div class="midias">{% for fl in e.files %}{{ media(fl, compact=compact) }}{% endfor %}</div>
-    {% endif %}
-  </div>
-{% endmacro %}
-
 {% if not days %}
-  <div class="vazio">
-    {% if stats.n %}<strong>Nenhum registro com esses filtros</strong><a href="{{ url_base }}">Limpar filtros</a>
-    {% else %}<strong>Nenhuma prova cadastrada ainda</strong>
-      {% if not share %}Adicione prints, áudios, vídeos e documentos na ordem em que aconteceram.<br><br>
-      <a class="botao" href="{{ url_for('new', pid=proc.id) }}">+ Adicionar a primeira prova</a>{% endif %}
-    {% endif %}
+  <div class="card">
+    <div class="empty">
+      {% if stats.n %}{{ icon('search', 24) }}<strong>Nenhum registro com esses filtros</strong>
+        <a class="btn btn-secondary" href="{{ url_base }}">Limpar filtros</a>
+      {% else %}{{ icon('clock', 24) }}<strong>Nenhuma prova cadastrada ainda</strong>
+        {% if not share %}<p>Adicione prints, áudios, vídeos e documentos na ordem em que aconteceram.</p>
+        <a class="btn btn-primary" href="{{ url_for('new', pid=proc.id) }}">{{ icon('plus') }}Adicionar a primeira prova</a>{% endif %}
+      {% endif %}
+    </div>
   </div>
-{% else %}
+{% elif modo == 'horizontal' %}
   {% if days|length > 1 %}
-  <nav class="dias-atalho nao-imprimir" aria-label="Ir para o dia">
-    {% for day, evs in days %}<a href="#d{{ day }}" data-dia="d{{ day }}">{{ (day ~ 'T00:00')|fmt_day_short }} <span class="sutil">({{ evs|length }})</span></a>{% endfor %}
+  <nav class="tl-chips always" aria-label="Ir para o dia">
+    {% for day, evs in days %}<a class="chip" href="#d{{ day }}" data-dia="d{{ day }}">{{ (day ~ 'T00:00')|fmt_day_short }} · {{ evs|length }}</a>{% endfor %}
   </nav>
   {% endif %}
-
-  {% if modo == 'horizontal' %}
   <div class="htl" data-htl>
-    <button type="button" class="htl-nav ant" aria-label="Anterior">‹</button>
-    <div class="htl-trilho" tabindex="0">
+    <button type="button" class="htl-nav prev" aria-label="Anterior">{{ icon('chevron-left', 20) }}</button>
+    <div class="htl-track htl-trilho" tabindex="0" aria-label="Linha do tempo horizontal">
       {% for day, evs in days %}
-      <section class="htl-dia" id="d{{ day }}">
-        <h2 class="htl-dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }}</span></h2>
-        <div class="htl-eventos">
+      <section class="htl-day" id="d{{ day }}">
+        <header class="tl-day-head"><h2>{{ (day ~ 'T00:00')|fmt_day }}</h2><span>{{ evs|length }} registro{{ 's' if evs|length != 1 }}</span></header>
+        <div class="htl-items">
           {% for e in evs %}
-          <article class="htl-evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
-            <span class="htl-hora">{{ e.occurred_at|hora }}</span>
-            {{ evento_corpo(e, True) }}
-          </article>
+          <div class="htl-item {{ 'destaque' if e.important }}">
+            <span class="htl-time">{{ e.occurred_at|hora }}</span>
+            {{ evidence_card(e, proc, share) }}
+          </div>
           {% endfor %}
         </div>
       </section>
       {% endfor %}
     </div>
-    <button type="button" class="htl-nav prox" aria-label="Próximo">›</button>
-    <div class="htl-regua nao-imprimir">
+    <button type="button" class="htl-nav next" aria-label="Próximo">{{ icon('chevron-right', 20) }}</button>
+    <div class="htl-scrub no-print">
       <span>{{ days[0][0]|fmt_date }}</span>
       <input type="range" min="0" max="1000" value="0" aria-label="Navegar pela linha do tempo">
       <span>{{ days[-1][0]|fmt_date }}</span>
     </div>
   </div>
-  {% else %}
-  <div class="linha">
-    {% for day, evs in days %}
-    <section class="dia" id="d{{ day }}">
-      <h2 class="dia-titulo"><span>{{ (day ~ 'T00:00')|fmt_day }} <small>{{ evs|length }} registro(s)</small></span></h2>
-      {% for e in evs %}
-      <article class="evento {% if e.important %}destaque{% endif %}" id="e{{ e.id }}">
-        <div class="hora">{{ e.occurred_at|hora }}</div>
-        {{ evento_corpo(e, False) }}
-      </article>
+{% else %}
+  <div class="tl-layout">
+    <aside class="tl-index" aria-label="Datas">
+      <span class="eyebrow">Datas</span>
+      <ol>
+        {% for day, evs in days %}<li><a href="#d{{ day }}" data-dia="d{{ day }}"><span>{{ (day ~ 'T00:00')|fmt_day_short }}</span><span class="mono">{{ evs|length }}</span></a></li>{% endfor %}
+      </ol>
+    </aside>
+    <div>
+      {% if days|length > 1 %}
+      <nav class="tl-chips" aria-label="Ir para o dia">
+        {% for day, evs in days %}<a class="chip" href="#d{{ day }}" data-dia="d{{ day }}">{{ (day ~ 'T00:00')|fmt_day_short }} · {{ evs|length }}</a>{% endfor %}
+      </nav>
+      {% endif %}
+      {% for day, evs in days %}
+      <section class="tl-day" id="d{{ day }}" data-dia-secao>
+        <header class="tl-day-head"><h2>{{ (day ~ 'T00:00')|fmt_day }}</h2><span>{{ evs|length }} registro{{ 's' if evs|length != 1 }}</span></header>
+        {% for e in evs %}
+        <div class="tl-item {{ 'destaque' if e.important }}">
+          <div class="tl-time">{{ e.occurred_at|hora }}</div>
+          <div class="tl-rail" aria-hidden="true"></div>
+          {{ evidence_card(e, proc, share) }}
+        </div>
+        {% endfor %}
+      </section>
       {% endfor %}
-    </section>
-    {% endfor %}
+    </div>
   </div>
-  {% endif %}
 {% endif %}
 {% endblock %}

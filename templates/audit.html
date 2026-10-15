@@ -1,37 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Auditoria{% endblock %}
 {% block content %}
-<div class="cabecalho">
+<div class="page-head">
   <div>
-    <h1>Registro de auditoria</h1>
-    <p class="sutil" style="margin:4px 0 0">Entradas, criações, edições, exclusões, downloads e acessos por link ficam registrados (últimos 1000 eventos).</p>
+    <h1>Auditoria</h1>
+    <p>Entradas, envios, edições, exclusões, downloads e acessos por link, com data e IP (últimos 1000 eventos).</p>
   </div>
   {% if admin_view %}
-  <form method="get" class="acoes">
-    <select name="cliente" onchange="this.form.submit()">
+  <form method="get" class="actions">
+    <label class="sr-only" for="f-cliente">Cliente</label>
+    <select name="cliente" id="f-cliente" data-autoenvio>
       <option value="">Todos os clientes</option>
       {% for t in tenants %}<option value="{{ t.id }}" {% if tid == t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
     </select>
+    <button class="btn btn-secondary sem-js">Filtrar</button>
   </form>
   {% endif %}
 </div>
-<div class="tabela-caixa">
-<table class="tabela">
-  <thead><tr><th>Quando</th>{% if admin_view %}<th>Cliente</th>{% endif %}<th>Quem</th><th>IP</th><th>Ação</th><th>Detalhes</th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-  <tr>
-    <td class="nowrap">{{ r.at|fmt_dt }}</td>
-    {% if admin_view %}<td>{{ r.tenant_name or '—' }}</td>{% endif %}
-    <td>{{ r.user_email or r.role }}{% if r.user_email %}<br><small class="sutil">{{ r.role }}</small>{% endif %}</td>
-    <td>{{ r.ip }}</td>
-    <td class="nowrap">{{ r.action }}</td>
-    <td class="quebra">{{ r.detail }}</td>
-  </tr>
+<div class="card card-flush">
+  {% if rows %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Quando</th>{% if admin_view %}<th>Cliente</th>{% endif %}<th>Quem</th><th>IP</th><th>Evento</th><th>Detalhes</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="mono xsmall">{{ r.at|fmt_dt }}</td>
+      {% if admin_view %}<td>{{ r.tenant_name or '—' }}</td>{% endif %}
+      <td>{{ r.user_email or r.role }}{% if r.user_email %}<div class="subtle xsmall">{{ r.role }}</div>{% endif %}</td>
+      <td class="mono xsmall">{{ r.ip }}</td>
+      <td><span class="chip {{ 'chip-danger' if 'excluir' in r.action else ('chip-verified' if r.action in ('baixar', 'exportar', 'relatorio') else '') }}">{{ r.action }}</span></td>
+      <td class="wrap">{{ r.detail }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
   {% else %}
-  <tr><td colspan="6" class="sutil">Nenhum evento.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+  <div class="empty">{{ icon('list', 24) }}<strong>Nenhum evento registrado</strong></div>
+  {% endif %}
 </div>
 {% endblock %}

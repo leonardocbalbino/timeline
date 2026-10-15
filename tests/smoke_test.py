@@ -143,7 +143,7 @@ assert "Espaço insuficiente" in ok(r)
 # verificar
 r = cli.post("/verificar", data={"csrf": ct, "arquivo": (io.BytesIO(b"hello world"), "a.jpg")},
              content_type="multipart/form-data")
-assert "Idêntico" in ok(r)
+assert "Arquivo íntegro" in ok(r)
 print("cliente free ok")
 
 # pagamento Pix

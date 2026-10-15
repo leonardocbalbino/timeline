@@ -1,4 +1,6 @@
-# Linha do Tempo de Provas
+# Íntegra
+
+*Provas em ordem, do fato ao processo.*
 
 Sistema leve (Python/Flask + SQLite), multi-cliente, para organizar prints, áudios e vídeos
 em uma linha do tempo por processo, dia e horário, para apresentação ao jurídico.

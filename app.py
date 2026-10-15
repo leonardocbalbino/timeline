@@ -1,4 +1,4 @@
-"""Linha do Tempo de Provas - sistema multi-cliente para organizar prints, áudios e vídeos
+"""Íntegra - sistema multi-cliente para organizar prints, áudios e vídeos
 em ordem cronológica por processo, com hash SHA-256 de cada arquivo e registro de auditoria."""
 import csv
 import hashlib
@@ -573,7 +573,7 @@ def build_export(proc):
         z.writestr("manifesto.csv", "﻿" + manifest.getvalue())
         z.writestr("LEIA-ME.txt",
                    f"Processo: {proc['title']} {proc['number']}\n"
-                   "Pacote exportado da Linha do Tempo de Provas em " + fmt_dt(now()) + ".\n"
+                   "Pacote exportado do Íntegra em " + fmt_dt(now()) + ".\n"
                    "O arquivo manifesto.csv lista cada prova em ordem cronológica e o hash\n"
                    "SHA-256 de cada arquivo, calculado no momento do envio ao sistema.\n"
                    "Para conferir a integridade de um arquivo:\n"
@@ -739,7 +739,7 @@ def payment(pay_id):
         flash("Pagamento informado. Assim que o administrador confirmar, o plano Pro é liberado.", "ok")
         return redirect(url_for("payment", pay_id=pay_id))
     code = pix.brcode(setting("pix_chave"), setting("pix_nome"), setting("pix_cidade"),
-                      pay["amount_cents"] / 100, pay["txid"], "Linha do Tempo Pro")
+                      pay["amount_cents"] / 100, pay["txid"], "Integra Pro")
     return render_template("payment.html", pay=pay, code=code, qr=pix.qr_svg_data_uri(code),
                            pix_nome=setting("pix_nome"))
 

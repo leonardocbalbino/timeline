@@ -1,100 +1,101 @@
 {% extends "base.html" %}
-{% block title %}{{ t.name if editing else 'Novo cliente' }} · Admin{% endblock %}
+{% block title %}{{ t.name if editing else 'Novo cliente' }}{% endblock %}
 {% block content %}
-<div class="formulario estreito" style="gap:0;max-width:820px">
-<div class="trilha"><a href="{{ url_for('admin_home') }}">Clientes</a> ›</div>
+<div class="page-narrow stack-lg" style="max-width:820px">
+<div>
+<nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('admin_home') }}">Clientes</a><span>/</span><span>{{ t.name if editing else 'Novo cliente' }}</span></nav>
 
 {% if senha %}
-<div class="senha-gerada">
-  <strong>Dados de acesso do cliente</strong> — copie agora, a senha não será mostrada de novo.<br>
-  Endereço: <code>{{ url_for('login', _external=True) }}</code><br>
-  E-mail: <code>{{ senha.email }}</code><br>
-  Senha: <code id="senha-nova">{{ senha.senha }}</code>
-  <button type="button" class="botao secundario mini" data-copiar-texto="Acesse {{ url_for('login', _external=True) }}&#10;E-mail: {{ senha.email }}&#10;Senha: {{ senha.senha }}">Copiar mensagem</button>
+<div class="secret" role="status">
+  <div class="row">{{ icon('key') }}<strong>Dados de acesso do cliente</strong><span class="subtle small">copie agora: a senha não será mostrada de novo</span></div>
+  <div>Endereço: <code>{{ url_for('login', _external=True) }}</code></div>
+  <div>E-mail: <code>{{ senha.email }}</code></div>
+  <div>Senha: <code id="senha-nova">{{ senha.senha }}</code></div>
+  <div><button type="button" class="btn btn-secondary btn-sm" data-copiar-texto="Acesse {{ url_for('login', _external=True) }}&#10;E-mail: {{ senha.email }}&#10;Senha: {{ senha.senha }}">{{ icon('copy', 16) }}Copiar mensagem para o cliente</button></div>
 </div>
 {% endif %}
 
-<form method="post" class="cartao formulario">
+<form method="post" class="card card-lg stack-lg">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <div class="cabecalho" style="margin:0">
+  <div class="row-between">
     <h1>{{ t.name if editing else 'Novo cliente' }}</h1>
-    {% if editing %}<span class="selo {{ effective_plan(t) }}">{{ PLAN_LABELS[effective_plan(t)] }}</span>{% endif %}
+    {% if editing %}{% if effective_plan(t) == 'pro' %}<span class="badge-pro">Pro</span>{% else %}<span class="chip">Free</span>{% endif %}{% endif %}
   </div>
-  <div class="linha-campos">
-    <label>Nome / razão social <input type="text" name="nome" value="{{ t.name or '' }}" required maxlength="200"></label>
+  <div class="form-grid">
+    <label>Nome ou razão social <input type="text" name="nome" value="{{ t.name or '' }}" required maxlength="200"></label>
     <label>E-mail de login <input type="email" name="email" value="{{ user.email if user else (t.email or '') }}" {{ 'required' if not editing }} maxlength="200" autocomplete="off"></label>
+    <label>CPF / CNPJ <span class="hint">opcional</span><input type="text" name="documento" value="{{ t.document or '' }}" maxlength="30" style="font-family:var(--font-mono)"></label>
+    <label>Telefone <span class="hint">opcional</span><input type="text" name="telefone" value="{{ t.phone or '' }}" maxlength="30"></label>
+    {% if not editing %}
+    <label class="full">Senha inicial <span class="hint">deixe em branco para gerar uma senha forte automaticamente</span>
+      <input type="text" name="senha" minlength="8" autocomplete="off"></label>
+    {% endif %}
   </div>
-  <div class="linha-campos">
-    <label>CPF / CNPJ <span class="ajuda">opcional</span><input type="text" name="documento" value="{{ t.document or '' }}" maxlength="30"></label>
-    <label>Telefone <span class="ajuda">opcional</span><input type="text" name="telefone" value="{{ t.phone or '' }}" maxlength="30"></label>
-  </div>
-  {% if not editing %}
-  <label>Senha inicial <span class="ajuda">deixe em branco para gerar uma senha forte automaticamente</span>
-    <input type="text" name="senha" minlength="8" autocomplete="off"></label>
-  {% endif %}
 
   <fieldset>
     <legend>Plano</legend>
-    <div class="linha-campos">
+    <div class="form-grid">
       <label>Plano
         <select name="plano">
           {% for k, nome in PLAN_LABELS.items() %}<option value="{{ k }}" {% if t.plan == k %}selected{% endif %}>{{ nome }}</option>{% endfor %}
         </select></label>
-      <label>Pro válido até <span class="ajuda">em branco = sem vencimento</span>
+      <label>Pro válido até <span class="hint">em branco = sem vencimento</span>
         <input type="date" name="pro_ate" value="{{ t.pro_until or '' }}"></label>
     </div>
-    <p class="sutil pequeno" style="margin:0">Quando o Pro vence, o cliente volta automaticamente para o Free: os dados ficam guardados, mas os recursos e limites passam a ser os do Free. Pagamentos via Pix confirmados somam dias ao vencimento.</p>
+    <p class="subtle small">Quando o Pro vence, o cliente volta automaticamente para o Free: os dados ficam guardados, mas recursos e limites passam a ser os do Free. Pagamentos Pix confirmados somam dias ao vencimento.</p>
   </fieldset>
 
   <label>Observações internas <textarea name="obs" rows="3">{{ t.notes or '' }}</textarea></label>
-  <label class="check"><input type="checkbox" name="ativo" value="1" {% if t.active %}checked{% endif %}> Conta ativa (desmarque para bloquear o acesso do cliente e os links compartilhados)</label>
+  <label class="check"><input type="checkbox" name="ativo" value="1" {% if t.active %}checked{% endif %}>
+    <span>Conta ativa <span class="hint">— desmarque para bloquear o acesso do cliente e os links compartilhados</span></span></label>
 
-  <div class="acoes">
-    <button class="botao">{{ 'Salvar' if editing else 'Cadastrar cliente' }}</button>
-    <a href="{{ url_for('admin_home') }}">Cancelar</a>
+  <div class="form-actions">
+    <button class="btn btn-primary">{{ 'Salvar' if editing else 'Cadastrar cliente' }}</button>
+    <a class="btn btn-ghost" href="{{ url_for('admin_home') }}">Cancelar</a>
   </div>
 </form>
+</div>
 
 {% if editing %}
-<section class="cartao">
+<section class="card card-lg stack">
   <h2>Acesso</h2>
-  <p class="sutil" style="margin-top:0">
-    {% if user %}Login: <strong>{{ user.email }}</strong> · último acesso: {{ user.last_login|fmt_dt if user.last_login else 'nunca' }}{% else %}Este cliente ainda não tem login.{% endif %}
-    · {{ procs|length }} processo(s) · {{ used|human_size }} usados
-  </p>
-  <div class="acoes">
+  <div class="meta-line" style="margin:0">
+    {% if user %}<span>Login: <strong>{{ user.email }}</strong></span><span>Último acesso: <span class="mono">{{ user.last_login|fmt_dt if user.last_login else 'Nunca' }}</span></span>
+    {% else %}<span>Este cliente ainda não tem login.</span>{% endif %}
+    <span><span class="mono">{{ procs|length }}</span> processo{{ 's' if procs|length != 1 }} · <span class="mono">{{ used|human_size }}</span></span>
+  </div>
+  <div class="row">
     <form method="post" action="{{ url_for('admin_client_enter', tid=t.id) }}">
       <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      <button class="botao">Acessar conta do cliente</button>
+      <button class="btn btn-dark">Acessar conta do cliente {{ icon('arrow-right', 16) }}</button>
     </form>
     {% if user %}
     <form method="post" action="{{ url_for('admin_client_password', tid=t.id) }}">
       <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      <button class="botao secundario" data-confirmar="Gerar uma nova senha? A senha atual deixa de funcionar e o cliente é desconectado.">Gerar nova senha</button>
+      <button class="btn btn-secondary" data-confirmar="Gerar uma nova senha? A senha atual deixa de funcionar e o cliente é desconectado.">{{ icon('key', 16) }}Gerar nova senha</button>
     </form>
     {% endif %}
   </div>
   {% if procs %}
-  <ul style="margin:14px 0 0;padding-left:20px">
-    {% for p in procs %}<li>{{ p.title }}{% if p.number %} <code class="sutil">{{ p.number }}</code>{% endif %} — {{ p.n }} prova(s){% if p.share_token %} · 🔗 link ativo{% endif %}</li>{% endfor %}
+  <ul class="file-list">
+    {% for p in procs %}<li><span class="ft">{{ icon('folder', 18) }}</span><span class="fn">{{ p.title }}{% if p.number %} <span class="mono subtle">{{ p.number }}</span>{% endif %}</span>
+      <span class="fs">{{ p.n }} prova{{ 's' if p.n != 1 }}</span>{% if p.share_token %}<span class="chip">{{ icon('link', 14) }}Link ativo</span>{% endif %}</li>{% endfor %}
   </ul>
   {% endif %}
 </section>
 
-{% if pays %}
-<section class="cartao">
-  <h2>Pagamentos</h2>
-  {% with show_tenant=False %}{% include "admin/_payments_table.html" %}{% endwith %}
+<section class="card card-flush">
+  <div class="card-head"><h2>Pagamentos</h2></div>
+  {% with show_tenant=False, empty_text='Nenhum pagamento deste cliente.' %}{% include "admin/_payments_table.html" %}{% endwith %}
 </section>
-{% endif %}
 
-<section class="cartao zona-perigo">
+<section class="card card-lg stack danger-zone">
   <h2>Excluir cliente</h2>
-  <p class="sutil" style="margin-top:0">Apaga o cliente, o login, todos os processos, provas e arquivos. Não tem como desfazer. Para só bloquear o acesso, desmarque “Conta ativa”.</p>
+  <p class="muted">Apaga o cliente, o login, todos os processos, provas e arquivos. Não tem como desfazer. Para só bloquear o acesso, desmarque “Conta ativa”.</p>
   <form method="post" action="{{ url_for('admin_client_delete', tid=t.id) }}">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <label>Digite <code>{{ t.name }}</code> para confirmar <input type="text" name="confirmar" required autocomplete="off"></label>
-    <button class="botao perigo">Excluir definitivamente</button>
+    <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
   </form>
 </section>
 {% endif %}

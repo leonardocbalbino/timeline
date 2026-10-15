@@ -1,55 +1,58 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Editar processo' if editing else 'Novo processo' }}{% endblock %}
+{% block title %}{{ 'Processo e compartilhamento' if editing else 'Novo processo' }}{% endblock %}
 {% block content %}
-<div class="formulario estreito" style="gap:0">
-<div class="trilha"><a href="{{ url_for('index') }}">Processos</a>{% if editing %} › <a href="{{ url_for('timeline', pid=p.id) }}">{{ p.title }}</a>{% endif %}</div>
-<form method="post" class="cartao formulario">
-  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <h1>{{ 'Editar processo' if editing else 'Novo processo' }}</h1>
-  <label>Nome do processo / caso
-    <input type="text" name="titulo" value="{{ p.title or '' }}" required maxlength="200" placeholder="Ex.: Ação trabalhista — Empresa X"></label>
-  <label>Número do processo <span class="ajuda">opcional</span>
-    <input type="text" name="numero" value="{{ p.number or '' }}" maxlength="80" placeholder="0000000-00.0000.0.00.0000"></label>
-  <label>Descrição <span class="ajuda">opcional — partes, vara, advogado, objetivo</span>
-    <textarea name="descricao" rows="4">{{ p.description or '' }}</textarea></label>
-  <div class="acoes">
-    <button class="botao">{{ 'Salvar' if editing else 'Criar processo' }}</button>
-    <a href="{{ url_for('timeline', pid=p.id) if editing else url_for('index') }}">Cancelar</a>
-  </div>
-</form>
+<div class="page-narrow stack-lg">
+<div>
+  <nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('index') }}">Processos</a>{% if editing %}<span>/</span><a href="{{ url_for('timeline', pid=p.id) }}">{{ p.title }}</a>{% endif %}<span>/</span><span>{{ 'Editar' if editing else 'Novo processo' }}</span></nav>
+  <form method="post" class="card card-lg stack-lg">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <h1>{{ 'Dados do processo' if editing else 'Novo processo' }}</h1>
+    <label>Nome do processo ou caso
+      <input type="text" name="titulo" value="{{ p.title or '' }}" required maxlength="200" placeholder="Ex.: Ação trabalhista — Empresa X"></label>
+    <label>Número do processo <span class="hint">opcional</span>
+      <input type="text" name="numero" value="{{ p.number or '' }}" maxlength="80" placeholder="0000000-00.0000.0.00.0000" style="font-family:var(--font-mono)"></label>
+    <label>Descrição <span class="hint">opcional — partes, vara, advogado, objetivo</span>
+      <textarea name="descricao" rows="4">{{ p.description or '' }}</textarea></label>
+    <div class="form-actions">
+      <button class="btn btn-primary">{{ 'Salvar' if editing else 'Criar processo' }}</button>
+      <a class="btn btn-ghost" href="{{ url_for('timeline', pid=p.id) if editing else url_for('index') }}">Cancelar</a>
+    </div>
+  </form>
+</div>
 
 {% if editing %}
-<section class="cartao" id="compartilhar">
-  <h2>Link somente leitura {% if not has_feature('compartilhar') %}<span class="selo pro">Pro</span>{% endif %}</h2>
+<section class="card card-lg stack" id="compartilhar">
+  <div class="row"><h2>Compartilhar com o advogado</h2>{% if not has_feature('compartilhar') %}<span class="badge-pro">Pro</span>{% endif %}</div>
   {% if has_feature('compartilhar') %}
-    <p class="sutil" style="margin-top:0">Envie este link ao advogado ou a quem precisa ver as provas. Quem tiver o link vê a linha do tempo deste processo, sem poder alterar nada. Cada acesso e download fica na auditoria.</p>
+    <p class="muted">Quem tiver este link vê a linha do tempo deste processo, abre o relatório e baixa os arquivos, sem poder alterar nada. Cada acesso e download fica na auditoria.</p>
     {% if p.share_token %}
-      <div class="copiar"><input type="text" readonly value="{{ url_for('share_view', token=p.share_token, _external=True) }}" id="link-compartilhar">
-        <button type="button" class="botao secundario" data-copiar="link-compartilhar">Copiar</button></div>
-      <form method="post" action="{{ url_for('process_share', pid=p.id) }}" class="acoes" style="margin-top:12px">
+      <div class="copy-field"><label class="sr-only" for="link-compartilhar">Link somente leitura</label>
+        <input type="text" readonly value="{{ url_for('share_view', token=p.share_token, _external=True) }}" id="link-compartilhar">
+        <button type="button" class="btn btn-secondary" data-copiar="link-compartilhar">{{ icon('copy', 16) }}Copiar</button></div>
+      <form method="post" action="{{ url_for('process_share', pid=p.id) }}" class="row">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="botao secundario mini" name="acao" value="gerar" data-confirmar="Gerar um novo link? O link atual deixará de funcionar.">Gerar novo link</button>
-        <button class="botao secundario mini" name="acao" value="revogar">Revogar acesso</button>
+        <button class="btn btn-secondary btn-sm" name="acao" value="gerar" data-confirmar="Gerar um novo link? O link atual deixará de funcionar.">Gerar novo link</button>
+        <button class="btn btn-ghost btn-sm" name="acao" value="revogar" style="color:var(--danger)">Revogar acesso</button>
       </form>
     {% else %}
       <form method="post" action="{{ url_for('process_share', pid=p.id) }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="botao" name="acao" value="gerar">Gerar link de acesso</button>
+        <button class="btn btn-primary" name="acao" value="gerar">{{ icon('link', 16) }}Gerar link somente leitura</button>
       </form>
     {% endif %}
   {% else %}
-    <p class="sutil" style="margin-top:0">Compartilhe a linha do tempo com o advogado por um link seguro, somente leitura.</p>
-    <a class="botao pro" href="{{ url_for('plan') }}">Conhecer o plano Pro</a>
+    <p class="muted">Envie a linha do tempo ao advogado por um link seguro, somente leitura, sem que ele precise criar conta.</p>
+    <div><a class="btn btn-dark" href="{{ url_for('plan') }}">Conhecer o plano Pro</a></div>
   {% endif %}
 </section>
 
-<section class="cartao zona-perigo">
+<section class="card card-lg stack danger-zone">
   <h2>Excluir processo</h2>
-  <p class="sutil" style="margin-top:0">Apaga o processo, todas as provas e todos os arquivos dele. Não tem como desfazer.</p>
+  <p class="muted">Apaga o processo, todas as provas e todos os arquivos dele. Não tem como desfazer.</p>
   <form method="post" action="{{ url_for('process_delete', pid=p.id) }}">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
     <label>Digite <code>{{ p.title }}</code> para confirmar <input type="text" name="confirmar" required autocomplete="off"></label>
-    <button class="botao perigo">Excluir definitivamente</button>
+    <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
   </form>
 </section>
 {% endif %}

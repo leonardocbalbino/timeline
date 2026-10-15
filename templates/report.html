@@ -1,39 +1,55 @@
 {% extends "base.html" %}
-{% from "_media.html" import media %}
-{% block title %}Relatório cronológico · {{ proc.title }}{% endblock %}
-{% block bodyclass %}relatorio{% endblock %}
-{% block content %}
-<div class="nao-imprimir barra-relatorio">
-  <a href="{{ url_for('share_view', token=g.share_token) if g.share_token else url_for('timeline', pid=proc.id) }}">← Voltar</a>
-  <button class="botao" onclick="window.print()">Imprimir / Salvar em PDF</button>
-  <span class="sutil pequeno">Áudios e vídeos aparecem como referência (nome, tamanho e hash). Os arquivos originais estão no pacote ZIP.</span>
-</div>
-<h1>Relatório cronológico de provas</h1>
-<p style="margin:6px 0 2px"><strong>{{ proc.title }}</strong>{% if proc.number %} · Processo nº {{ proc.number }}{% endif %}</p>
-<p class="sutil" style="margin-top:0">Gerado em {{ generated }} (horário de Brasília) · {{ total }} registro(s)
-  {% if f.de or f.ate %}· período {{ f.de or 'início' }} a {{ f.ate or 'fim' }}{% endif %}</p>
+{% block title %}Relatório · {{ proc.title }}{% endblock %}
+{% block bodyclass %}report-page{% endblock %}
+{% block header %}{% endblock %}
+{% block main %}
+<main class="report">
+  <div class="report-toolbar no-print">
+    <a class="btn btn-ghost" href="{{ url_for('share_view', token=g.share_token) if g.share_token else url_for('timeline', pid=proc.id) }}">{{ icon('arrow-left', 16) }}Voltar</a>
+    <button type="button" class="btn btn-primary" data-imprimir>{{ icon('printer', 16) }}Imprimir / salvar em PDF</button>
+    <span class="subtle small">Áudios e vídeos aparecem como referência (nome, tamanho e hash). Os originais estão no pacote ZIP.</span>
+  </div>
 
-<table class="tabela-relatorio">
-  <thead><tr><th>#</th><th>Data e hora</th><th>Registro</th></tr></thead>
-  <tbody>
+  <header class="report-head">
+    <span class="logo"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></span>
+    <div>
+      <span class="eyebrow" style="color:var(--text-subtle)">Relatório cronológico de provas</span>
+      <h1>{{ proc.title }}</h1>
+    </div>
+    <dl>
+      {% if proc.number %}<div><dt>Processo</dt><dd class="mono">{{ proc.number }}</dd></div>{% endif %}
+      <div><dt>Período</dt><dd class="mono">{% if f.de or f.ate %}{{ f.de|fmt_date or 'início' }} → {{ f.ate|fmt_date or 'fim' }}{% elif days %}{{ days[0][0]|fmt_date }} → {{ days[-1][0]|fmt_date }}{% else %}—{% endif %}</dd></div>
+      <div><dt>Registros</dt><dd class="mono">{{ total }}</dd></div>
+      <div><dt>Gerado em</dt><dd class="mono">{{ generated }} (Brasília)</dd></div>
+    </dl>
+  </header>
+
   {% set n = namespace(i=0) %}
   {% for day, evs in days %}
-    <tr class="linha-dia"><td colspan="3">{{ (day ~ 'T00:00')|fmt_day }}</td></tr>
+    <h2 class="report-day">{{ (day ~ 'T00:00')|fmt_day }}</h2>
     {% for e in evs %}{% set n.i = n.i + 1 %}
-    <tr>
-      <td>{{ n.i }}</td>
-      <td class="nowrap">{{ e.occurred_at|fmt_dt }}</td>
-      <td>
-        <strong>{% if e.important %}★ {% endif %}{{ e.title }}</strong>
-        {% if e.source or e.people %}<div class="meta">{% if e.source %}Origem: {{ e.source }}. {% endif %}{% if e.people %}Envolvidos: {{ e.people }}.{% endif %}</div>{% endif %}
-        {% if e.description %}<p class="descricao">{{ e.description }}</p>{% endif %}
-        {% for fl in e.files %}{{ media(fl, report=True) }}{% endfor %}
-      </td>
-    </tr>
+    <article class="report-item">
+      <span class="n">{{ '%03d'|format(n.i) }}</span>
+      <span class="t">{{ e.occurred_at[11:19] }}</span>
+      <div>
+        <h3>{% if e.important %}<span class="chip chip-highlight" style="margin-right:6px">★ Destaque</span>{% endif %}{{ e.title }}</h3>
+        {% if e.source or e.people %}<p class="meta">{% if e.source %}Origem: {{ e.source }}. {% endif %}{% if e.people %}Envolvidos: {{ e.people }}.{% endif %}</p>{% endif %}
+        {% if e.description %}<p class="desc">{{ e.description }}</p>{% endif %}
+        {% set imgs = e.files|selectattr('kind', 'equalto', 'imagem')|list %}
+        {% if imgs %}<div class="report-thumbs">{% for fl in imgs %}<img src="{{ file_url(fl.id) }}" alt="{{ fl.original_name }}">{% endfor %}</div>{% endif %}
+        {% for fl in e.files %}
+        <div class="report-file">
+          <span class="fname">{{ fl.kind|capitalize }} · {{ fl.original_name }} · <span class="mono">{{ fl.size|human_size }}</span> · enviado em <span class="mono">{{ fl.uploaded_at|fmt_dt }}</span></span>
+          <span class="hash-full">SHA-256 {{ fl.sha256 }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
     {% endfor %}
+  {% else %}
+    <p class="subtle">Nenhum registro no período.</p>
   {% endfor %}
-  </tbody>
-</table>
-<p class="sutil rodape">Cada arquivo foi identificado pelo hash SHA-256 calculado no momento em que foi enviado ao sistema.
-Qualquer alteração no arquivo, por menor que seja, muda esse código. Para conferir: <code>certutil -hashfile arquivo SHA256</code> (Windows) ou <code>sha256sum arquivo</code> (Linux/Mac).</p>
+
+  <p class="report-foot">Cada arquivo foi identificado pelo hash SHA-256 calculado no momento em que foi enviado ao Íntegra. Qualquer alteração no arquivo, por menor que seja, muda esse código. Para conferir: <code>certutil -hashfile arquivo SHA256</code> (Windows) ou <code>sha256sum arquivo</code> (Linux/Mac).</p>
+</main>
 {% endblock %}

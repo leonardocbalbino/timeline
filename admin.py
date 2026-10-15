@@ -221,7 +221,9 @@ def admin_payments():
         sql += " WHERE p.status=?"
         args.append(status)
     pays = db().execute(sql + " ORDER BY p.id DESC LIMIT 500", args).fetchall()
-    return render_template("admin/payments.html", pays=pays, status=status)
+    counts = dict(db().execute("SELECT status, COUNT(*) FROM payments GROUP BY status").fetchall())
+    counts["todos"] = sum(counts.values())
+    return render_template("admin/payments.html", pays=pays, status=status, counts=counts)
 
 
 @app.route("/admin/pagamentos/<int:pay_id>/<acao>", methods=["POST"])

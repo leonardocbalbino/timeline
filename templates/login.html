@@ -1,17 +1,19 @@
 {% extends "base.html" %}
-{% block bodyclass %}tela-login{% endblock %}
-{% block content %}
-<form method="post" class="cartao login">
-  <span class="marca"><span class="marca-icone"></span><span>Linha do Tempo de Provas</span></span>
-  <div>
-    <h1>Entrar</h1>
-    <p class="sutil" style="margin:4px 0 0">Acesso restrito a clientes cadastrados.</p>
-  </div>
-  <label>E-mail <input type="text" name="email" autofocus required autocomplete="username" autocapitalize="off"></label>
-  <label>Senha <input type="password" name="senha" required autocomplete="current-password"></label>
-  <button type="submit" class="botao">Entrar</button>
-  <p class="sutil pequeno" style="margin:0;text-align:center">
-    {% if signup_open %}Ainda não tem conta? <a href="{{ url_for('signup') }}">Crie grátis</a> · {% endif %}<a href="{{ url_for('index') }}">Conheça o sistema</a>
-  </p>
-</form>
+{% block title %}Entrar{% endblock %}
+{% block header %}{% endblock %}
+{% block main %}
+<main class="auth">
+  <form method="post" class="auth-card">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <div>
+      <h1>Entrar</h1>
+      <p class="subtle" style="margin-top:4px">Acesse os processos e provas da sua conta.</p>
+    </div>
+    {% include "_flashes.html" %}
+    <label>E-mail <input type="text" inputmode="email" name="email" autofocus required autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+    <label>Senha <span class="password"><input type="password" name="senha" required autocomplete="current-password"></span></label>
+    <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+    <p class="auth-links">{% if signup_open %}<a href="{{ url_for('signup') }}">Crie grátis</a> · {% endif %}<a href="{{ url_for('index') }}">Conheça o sistema</a></p>
+  </form>
+</main>
 {% endblock %}

@@ -1,33 +1,31 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Editar prova' if editing else 'Nova prova' }} · {{ proc.title }}{% endblock %}
+{% block title %}{{ 'Editar prova' if editing else 'Nova prova' }}{% endblock %}
 {% block content %}
-<div class="formulario estreito" style="gap:0">
-<div class="trilha"><a href="{{ url_for('index') }}">Processos</a> › <a href="{{ url_for('timeline', pid=proc.id) }}">{{ proc.title }}</a></div>
-<form method="post" enctype="multipart/form-data" class="cartao formulario" id="form-prova">
+<div class="page-narrow">
+<nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('index') }}">Processos</a><span>/</span><a href="{{ url_for('timeline', pid=proc.id) }}">{{ proc.title }}</a><span>/</span><span>{{ 'Editar prova' if editing else 'Nova prova' }}</span></nav>
+<form method="post" enctype="multipart/form-data" class="card card-lg stack-lg" id="form-prova">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <h1>{% if editing %}Editar prova{% else %}Nova prova{% endif %}</h1>
 
-  <label class="arrastar" id="arrastar">
+  <label class="dropzone" id="arrastar">
     <input type="file" name="arquivos" id="arquivos" multiple
            accept="image/*,audio/*,video/*,.opus,.ogg,.m4a,.amr,.pdf,.txt">
-    <span><strong>Clique ou arraste</strong> prints, áudios ou vídeos aqui.<br>
-    <small class="sutil">Pode enviar vários arquivos do mesmo momento. Se o nome do arquivo tiver data (ex.: WhatsApp, Screenshot), ela é sugerida automaticamente.</small></span>
+    {{ icon('upload', 28) }}
+    <span><strong>Clique ou arraste</strong> prints, áudios ou vídeos</span>
+    <small>Pode enviar vários arquivos do mesmo momento. Se o nome do arquivo tiver data (WhatsApp, Screenshot, câmera), ela é sugerida automaticamente.</small>
   </label>
-  <ul id="lista-arquivos" class="lista-arquivos"></ul>
+  <ul id="lista-arquivos" class="file-list" aria-live="polite"></ul>
 
-  <div class="linha-campos">
+  <div class="form-grid">
     <label>Data do fato <input type="date" name="data" value="{{ ev.data or '' }}" required></label>
     <label>Hora <input type="time" name="hora" step="1" value="{{ ev.hora or '' }}"></label>
-  </div>
-  <p class="sutil pequeno" id="sugestao" style="margin:-8px 0 0"></p>
-
-  <label>Título <input type="text" name="titulo" value="{{ ev.title or ev.titulo or '' }}" required maxlength="300"
-         placeholder="Ex.: Mensagem de Fulano confirmando o horário"></label>
-  <label>Descrição / o que esta prova demonstra
-    <textarea name="descricao" rows="5">{{ ev.description or ev.descricao or '' }}</textarea></label>
-  <div class="linha-campos">
+    <p class="suggestion full" id="sugestao" aria-live="polite"></p>
+    <label class="full">Título <input type="text" name="titulo" value="{{ ev.title or ev.titulo or '' }}" required maxlength="300"
+           placeholder="Ex.: Mensagem de Fulano confirmando o horário"></label>
+    <label class="full">Descrição <span class="hint">O que esta prova demonstra</span>
+      <textarea name="descricao" rows="5">{{ ev.description or ev.descricao or '' }}</textarea></label>
     <label>Origem <input type="text" name="origem" list="origens" value="{{ ev.source or ev.origem or '' }}"
-           placeholder="WhatsApp, Instagram, e-mail, câmera..."></label>
+           placeholder="WhatsApp, Instagram, e-mail, câmera…"></label>
     <label>Pessoas envolvidas <input type="text" name="pessoas" value="{{ ev.people or ev.pessoas or '' }}"></label>
   </div>
   <datalist id="origens">
@@ -35,31 +33,42 @@
     <option>E-mail</option><option>SMS</option><option>Ligação gravada</option><option>Câmera de segurança</option>
     <option>Celular (galeria)</option><option>Documento</option>
   </datalist>
-  <label class="check"><input type="checkbox" name="destaque" value="1" {% if ev.important or ev.destaque %}checked{% endif %}> Marcar como destaque (prova importante)</label>
+
+  <label class="toggle">
+    <input type="checkbox" name="destaque" value="1" {% if ev.important or ev.destaque %}checked{% endif %}>
+    <span class="toggle-track"></span>{{ icon('star', 18) }}Marcar como destaque <span class="hint">prova importante</span>
+  </label>
 
   {% if files %}
   <fieldset>
     <legend>Arquivos já anexados</legend>
-    {% for fl in files %}
-    <label class="check"><input type="checkbox" name="remover" value="{{ fl.id }}"> Remover
-      <strong>{{ fl.original_name }}</strong> <small class="sutil">({{ fl.kind }}, {{ fl.size|human_size }})</small></label>
-    {% endfor %}
+    <ul class="file-list">
+      {% for fl in files %}
+      <li>
+        <span class="ft">{% if fl.kind == 'imagem' %}<img src="{{ url_for('file', fid=fl.id) }}" alt="" loading="lazy">{% else %}{{ icon({'audio': 'mic', 'video': 'video'}.get(fl.kind, 'file'), 18) }}{% endif %}</span>
+        <span class="fn" title="{{ fl.original_name }}">{{ fl.original_name }}</span>
+        <span class="fs">{{ fl.size|human_size }}</span>
+        <span class="fh" title="SHA-256: {{ fl.sha256 }}">{{ icon('shield-check', 14) }}{{ fl.sha256|short_hash }}</span>
+        <label class="check"><input type="checkbox" name="remover" value="{{ fl.id }}"> Remover</label>
+      </li>
+      {% endfor %}
+    </ul>
   </fieldset>
   {% endif %}
 
-  <div class="progresso" id="progresso" hidden><div></div><span></span></div>
+  <div class="progress" id="progresso" hidden><div></div><span></span></div>
 
-  <div class="acoes">
-    <button type="submit" class="botao">Salvar</button>
-    {% if not editing %}<button type="submit" name="continuar" value="1" class="botao secundario">Salvar e adicionar outra</button>{% endif %}
-    <a href="{{ url_for('timeline', pid=proc.id) }}">Cancelar</a>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">{{ icon('check') }}Salvar</button>
+    {% if not editing %}<button type="submit" name="continuar" value="1" class="btn btn-secondary">Salvar e adicionar outra</button>{% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('timeline', pid=proc.id) }}">Cancelar</a>
   </div>
 </form>
 
 {% if editing %}
-<form method="post" action="{{ url_for('delete', pid=proc.id, eid=ev.id) }}" style="margin-top:16px;text-align:right">
+<form method="post" action="{{ url_for('delete', pid=proc.id, eid=ev.id) }}" class="row" style="justify-content:flex-end;margin-top:var(--s-4)">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <button class="botao perigo" data-confirmar="Excluir esta prova e seus arquivos? A exclusão fica registrada na auditoria.">Excluir esta prova</button>
+  <button class="btn btn-ghost" style="color:var(--danger)" data-confirmar="Excluir esta prova e seus arquivos? A exclusão fica registrada na auditoria.">{{ icon('trash', 16) }}Excluir esta prova</button>
 </form>
 {% endif %}
 </div>

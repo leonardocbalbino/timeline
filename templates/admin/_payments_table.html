@@ -1,34 +1,37 @@
-<div class="tabela-caixa" style="box-shadow:none">
-<table class="tabela">
-  <thead><tr><th>Criada em</th>{% if show_tenant %}<th>Cliente</th>{% endif %}<th>Valor</th><th>Período</th><th>Situação</th><th>Comprovante</th><th></th></tr></thead>
+{% set admin_labels = True %}
+{% if pays %}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Criada em</th>{% if show_tenant %}<th>Cliente</th>{% endif %}<th class="num">Valor</th><th>Período</th><th>Situação</th><th>Comprovante</th><th><span class="sr-only">Ações</span></th></tr></thead>
   <tbody>
   {% for p in pays %}
   <tr>
-    <td class="nowrap">{{ p.created_at|fmt_dt }}<br><small class="sutil">{{ p.txid }}</small></td>
-    {% if show_tenant %}<td><a href="{{ url_for('admin_client', tid=p.tenant_id) }}">{{ p.tenant_name }}</a></td>{% endif %}
-    <td class="nowrap">{{ p.amount_cents|brl }}</td>
+    <td><span class="mono xsmall">{{ p.created_at|fmt_dt }}</span><div class="subtle mono" style="font-size:11.5px">{{ p.txid }}</div></td>
+    {% if show_tenant %}<td class="nowrap"><a href="{{ url_for('admin_client', tid=p.tenant_id) }}">{{ p.tenant_name }}</a></td>{% endif %}
+    <td class="num">{{ p.amount_cents|brl }}</td>
     <td class="nowrap">{{ p.days }} dias</td>
     <td>{% include "_pay_status.html" %}
-      {% if p.informed_at %}<br><small class="sutil">informado {{ p.informed_at|fmt_dt }}</small>{% endif %}
-      {% if p.decided_by %}<br><small class="sutil">por {{ p.decided_by }} em {{ p.decided_at|fmt_dt }}</small>{% endif %}
-      {% if p.note %}<br><small>“{{ p.note }}”</small>{% endif %}</td>
-    <td>{% if p.receipt_stored %}<a href="{{ url_for('admin_payment_receipt', pay_id=p.id) }}" target="_blank" rel="noopener">{{ p.receipt_name }}</a>{% else %}<span class="sutil">—</span>{% endif %}</td>
-    <td class="acoes-linha">
+      {% if p.informed_at %}<div class="subtle xsmall" style="margin-top:4px">informado <span class="mono">{{ p.informed_at|fmt_dt }}</span></div>{% endif %}
+      {% if p.decided_by %}<div class="subtle xsmall">por {{ p.decided_by }} em <span class="mono">{{ p.decided_at|fmt_dt }}</span></div>{% endif %}
+      {% if p.note %}<div class="xsmall muted">“{{ p.note }}”</div>{% endif %}</td>
+    <td>{% if p.receipt_stored %}<a href="{{ url_for('admin_payment_receipt', pay_id=p.id) }}" target="_blank" rel="noopener" title="{{ p.receipt_name }}">Ver</a>{% else %}<span class="subtle">—</span>{% endif %}</td>
+    <td><div class="actions">
       {% if p.status in ('pendente', 'informado') %}
       <form method="post" action="{{ url_for('admin_payment_decide', pay_id=p.id, acao='confirmar') }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="botao sucesso mini" data-confirmar="Confirmar o recebimento de {{ p.amount_cents|brl }} e liberar {{ p.days }} dias de Pro?">Confirmar</button>
+        <button class="btn btn-primary btn-sm" data-confirmar="Confirmar o recebimento de {{ p.amount_cents|brl }} e liberar {{ p.days }} dias de Pro?">{{ icon('check', 16) }}Confirmar</button>
       </form>
       <form method="post" action="{{ url_for('admin_payment_decide', pay_id=p.id, acao='recusar') }}">
         <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-        <button class="botao fantasma mini" data-confirmar="Recusar este pagamento?">Recusar</button>
+        <button class="btn btn-ghost btn-sm" data-confirmar="Recusar este pagamento?">Recusar</button>
       </form>
       {% endif %}
-    </td>
+    </div></td>
   </tr>
-  {% else %}
-  <tr><td colspan="7" class="sutil">Nenhum pagamento.</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+{% else %}
+<div class="empty">{{ icon('inbox', 24) }}<strong>{{ empty_text or 'Nenhum pagamento.' }}</strong></div>
+{% endif %}

@@ -1,53 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Processos{% endblock %}
 {% block content %}
-<div class="cabecalho">
+<div class="page-head">
   <div>
     <h1>Processos</h1>
-    <p class="sutil" style="margin:4px 0 0">{{ g.tenant.name }}</p>
+    <p>{{ g.tenant.name }}</p>
   </div>
-  <div class="acoes">
-    {% if can_create %}<a class="botao" href="{{ url_for('process_new') }}">+ Novo processo</a>
-    {% else %}<a class="botao pro" href="{{ url_for('plan') }}">Limite atingido · Assinar Pro</a>{% endif %}
+  <div class="actions">
+    {% if can_create %}<a class="btn btn-primary" href="{{ url_for('process_new') }}">{{ icon('plus') }}Novo processo</a>
+    {% else %}<a class="btn btn-dark" href="{{ url_for('plan') }}">Limite do plano atingido · Ver o Pro</a>{% endif %}
   </div>
 </div>
 
 {% set lim_mb = cfg.max_storage_mb|int %}
 {% set lim_p = cfg.max_processos|int %}
-<div class="uso">
-  <span><strong>{{ procs|length }}</strong>{% if lim_p %} de {{ lim_p }}{% endif %} processo(s)</span>
-  <span>
+<div class="usage-line">
+  <span><strong class="mono">{{ procs|length }}</strong>{% if lim_p %} de <span class="mono">{{ lim_p }}</span>{% endif %} processo{{ 's' if procs|length != 1 or lim_p }}</span>
+  <span class="row" style="gap:10px">
     {% if lim_mb %}{% set pc = [100, (used / (lim_mb * 1048576) * 100)|round(0, 'ceil')|int]|min %}
-      <span class="medidor {{ 'cheio' if pc >= 90 }}"><i style="width: {{ pc }}%"></i></span>
-      {{ used|human_size }} de {{ (lim_mb * 1048576)|human_size }} usados
-    {% else %}{{ used|human_size }} usados{% endif %}
+      <span class="usage {{ 'full' if pc >= 90 }}" role="img" aria-label="{{ pc }}% do espaço usado"><i style="width: {{ pc }}%"></i></span>
+      <span><span class="mono">{{ used|human_size }}</span> de <span class="mono">{{ (lim_mb * 1048576)|human_size }}</span></span>
+    {% else %}<span class="mono">{{ used|human_size }}</span> usados{% endif %}
   </span>
 </div>
 
 {% if not procs %}
-<div class="vazio">
-  <strong>Nenhum processo ainda</strong>
-  Crie um processo para começar a montar a linha do tempo de provas.<br><br>
-  <a class="botao" href="{{ url_for('process_new') }}">+ Criar o primeiro processo</a>
+<div class="card">
+  <div class="empty">
+    {{ icon('folder', 24) }}
+    <strong>Nenhum processo ainda</strong>
+    <p>Crie um processo para cada caso e monte nele a linha do tempo de provas.</p>
+    <a class="btn btn-primary" href="{{ url_for('process_new') }}">{{ icon('plus') }}Criar o primeiro processo</a>
+  </div>
 </div>
 {% else %}
-<div class="grade-processos">
+<div class="process-grid">
   {% for p in procs %}
-  <a class="cartao processo" href="{{ url_for('timeline', pid=p.id) }}">
+  <a class="card process-card" href="{{ url_for('timeline', pid=p.id) }}">
     <div>
       <h3>{{ p.title }}</h3>
-      {% if p.number %}<div class="numero">{{ p.number }}</div>{% endif %}
+      {% if p.number %}<div class="num">Proc. {{ p.number }}</div>{% endif %}
     </div>
     {% if p.description %}<p>{{ p.description }}</p>{% endif %}
-    <div class="numeros">
-      <span><strong>{{ p.n }}</strong> prova(s)</span>
-      <span>{{ p.bytes|human_size }}</span>
-      {% if p.a %}<span>{{ p.a|fmt_date }} → {{ p.b|fmt_date }}</span>{% endif %}
-      {% if p.share_token %}<span title="Link somente leitura ativo">🔗</span>{% endif %}
+    <div class="foot">
+      <span><strong>{{ p.n }}</strong> prova{{ 's' if p.n != 1 }}</span>
+      <span class="mono">{{ p.bytes|human_size }}</span>
+      {% if p.a %}<span class="mono">{{ p.a|fmt_date }} → {{ p.b|fmt_date }}</span>{% endif %}
+      {% if p.share_token %}<span class="row" style="gap:4px" title="Link somente leitura ativo">{{ icon('link', 14) }}Link ativo</span>{% endif %}
     </div>
   </a>
   {% endfor %}
-  {% if can_create %}<a class="cartao processo novo" href="{{ url_for('process_new') }}">+ Novo processo</a>{% endif %}
+  {% if can_create %}<a class="card process-card process-new" href="{{ url_for('process_new') }}">{{ icon('plus') }}Novo processo</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,59 @@
+/* Íntegra — design tokens. Todo o CSS usa estas variáveis. */
+:root {
+  /* Cores — cada cor tem UM significado */
+  --ink: #0E1A2B;          /* texto principal, header admin, botões escuros */
+  --ink-2: #1B2B44;        /* superfícies sobre fundo escuro */
+  --text: #0E1A2B;
+  --text-muted: #3B4B62;   /* parágrafos secundários */
+  --text-subtle: #5A6B82;  /* legendas, metadados (mínimo para contraste 4.5:1) */
+  --bg: #F5F6F8;           /* fundo das páginas do app */
+  --surface: #FFFFFF;      /* cards, tabelas, formulários */
+  --surface-2: #EEF1F5;    /* chips, item de menu ativo, hover */
+  --border: #E2E6EC;
+  --border-strong: #C9D1DC;/* borda de botões secundários e inputs */
+
+  --action: #2443B8;       /* SÓ botões primários e links */
+  --action-hover: #1A3290;
+
+  --verified: #0F766E;     /* SÓ integridade/hash/verificado */
+  --verified-bg: #E3F4F1;
+  --verified-bright: #2DD4BF; /* só decorativo sobre fundo escuro */
+
+  --highlight: #B45309;    /* SÓ "destaque" (prova importante) */
+  --highlight-text: #8A4006;
+  --highlight-bg: #FDF0E1;
+
+  --warning-bg: #FDF0E1;   /* banner de modo suporte */
+  --warning-border: #F3D9B8;
+  --warning-text: #6B3505;
+
+  --danger: #B42318;
+  --danger-bg: #FDECEA;
+
+  /* Sobre fundo escuro */
+  --on-dark-muted: #B7C4D6;
+  --on-dark-line: #24364F;
+  --on-dark-border: #2E4363;
+
+  /* Tipografia */
+  --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
+  --font-body: 'Public Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Raios */
+  --r-sm: 8px;   /* botões pequenos, inputs internos */
+  --r-md: 10px;  /* botões, inputs */
+  --r-lg: 14px;  /* cards, tabelas */
+  --r-xl: 20px;  /* cards de destaque (landing, login) */
+  --r-pill: 999px;
+
+  /* Espaço (escala de 4) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px; --s-16: 64px; --s-24: 96px;
+
+  --shadow-pop: 0 24px 48px -24px rgba(14,26,43,.25);
+  --shadow-soft: 0 1px 2px rgba(14,26,43,.06);
+  --focus-ring: 0 0 0 3px rgba(36,67,184,.15);
+  --container: 1200px;
+  --header-h: 64px;
+}

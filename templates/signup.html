@@ -1,25 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Criar conta · Linha do Tempo de Provas{% endblock %}
+{% block title %}Criar conta{% endblock %}
 {% block meta %}<meta name="robots" content="index, follow">{% endblock %}
-{% block bodyclass %}tela-login{% endblock %}
-{% block content %}
-<form method="post" class="cartao login" style="max-width:420px">
-  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-  <a class="marca" href="{{ url_for('index') }}"><span class="marca-icone"></span><span>Linha do Tempo de Provas</span></a>
-  <div>
-    <h1>Criar conta grátis</h1>
-    <p class="sutil" style="margin:4px 0 0">Você começa no plano Free. Dá para assinar o Pro depois, via Pix.</p>
-  </div>
-  <label>Seu nome <input type="text" name="nome" value="{{ form.nome }}" required maxlength="200" autocomplete="name" autofocus></label>
-  <label>E-mail <input type="email" name="email" value="{{ form.email }}" required maxlength="200" autocomplete="email"></label>
-  <div class="linha-campos">
-    <label>Senha <input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
-    <label>Confirmar senha <input type="password" name="confirma" required minlength="8" autocomplete="new-password"></label>
-  </div>
-  <label class="lp-isca" aria-hidden="true">Site <input type="text" name="site" tabindex="-1" autocomplete="off"></label>
-  <label class="check pequeno"><input type="checkbox" name="termos" value="1" required>
-    <span>Entendo que sou responsável pelos arquivos que envio e que o sistema não garante a aceitação das provas em juízo.</span></label>
-  <button type="submit" class="botao">Criar minha conta</button>
-  <p class="sutil pequeno" style="margin:0;text-align:center">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
-</form>
+{% block header %}{% endblock %}
+{% block main %}
+<main class="auth">
+  <form method="post" class="auth-card wide">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <div>
+      <h1>Criar conta grátis</h1>
+      <p class="subtle" style="margin-top:4px">Você começa no plano Free. Dá para assinar o Pro depois, via Pix.</p>
+    </div>
+    {% include "_flashes.html" %}
+    <label>Seu nome <input type="text" name="nome" value="{{ form.nome }}" required maxlength="200" autocomplete="name" autofocus></label>
+    <label>E-mail <input type="email" name="email" value="{{ form.email }}" required maxlength="200" autocomplete="email" spellcheck="false"></label>
+    <label>Senha <span class="hint">mínimo de 8 caracteres</span>
+      <span class="password"><input type="password" name="senha" required minlength="8" autocomplete="new-password"></span></label>
+    <label>Confirmar senha <span class="password"><input type="password" name="confirma" required minlength="8" autocomplete="new-password"></span></label>
+    <label class="honeypot" aria-hidden="true">Site <input type="text" name="site" tabindex="-1" autocomplete="off"></label>
+    <label class="check small"><input type="checkbox" name="termos" value="1" required>
+      <span>Entendo que sou responsável pelos arquivos que envio e que o Íntegra organiza e preserva provas, mas não garante sua aceitação em juízo nem substitui orientação jurídica.</span></label>
+    <button type="submit" class="btn btn-primary btn-block">Criar minha conta</button>
+    <p class="auth-links">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+  </form>
+</main>
 {% endblock %}

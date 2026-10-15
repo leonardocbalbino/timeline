@@ -1,68 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Plano{% endblock %}
 {% macro limites(cfg) %}
-  <li>{% if cfg.max_processos|int %}Até {{ cfg.max_processos }} processo(s){% else %}Processos ilimitados{% endif %}</li>
-  <li>{% if cfg.max_storage_mb|int %}{{ (cfg.max_storage_mb|int * 1048576)|human_size }} de armazenamento{% else %}Armazenamento ilimitado{% endif %}</li>
-  <li>Linha do tempo vertical, hash SHA-256 e auditoria interna</li>
-  {% for k, nome in FEATURES %}<li class="{{ '' if k in cfg.features else 'nao' }}">{{ nome }}</li>{% endfor %}
+  <li>{{ icon('check') }}<span>{% if cfg.max_processos|int %}Até {{ cfg.max_processos }} processo{{ 's' if cfg.max_processos|int > 1 }}{% else %}Processos ilimitados{% endif %}</span></li>
+  <li>{{ icon('check') }}<span>{% if cfg.max_storage_mb|int %}{{ (cfg.max_storage_mb|int * 1048576)|human_size }} de armazenamento{% else %}Armazenamento ilimitado{% endif %}</span></li>
+  <li>{{ icon('check') }}<span>Linha do tempo vertical e hash SHA-256 de cada arquivo</span></li>
+  {% for k, nome in FEATURES %}<li class="{{ '' if k in cfg.features else 'off' }}">{{ icon('check' if k in cfg.features else 'x') }}<span>{{ nome }}</span></li>{% endfor %}
 {% endmacro %}
 {% block content %}
-<div class="cabecalho">
+<div class="page-head">
   <div>
     <h1>Seu plano</h1>
-    <p class="sutil" style="margin:4px 0 0">
-      Plano atual: <span class="selo {{ current }}">{{ PLAN_LABELS[current] }}</span>
-      {% if current == 'pro' %}{% if g.tenant.pro_until %} · válido até <strong>{{ g.tenant.pro_until|fmt_date }}</strong>{% else %} · sem vencimento{% endif %}
-      {% elif g.tenant.plan == 'pro' and g.tenant.pro_until %} · o Pro venceu em {{ g.tenant.pro_until|fmt_date }}{% endif %}
-      · {{ nproc }} processo(s) · {{ used|human_size }} usados
-    </p>
+    <div class="meta-line">
+      <span>Plano atual: {% if current == 'pro' %}<span class="badge-pro">Pro</span>{% else %}<span class="chip">Free</span>{% endif %}</span>
+      {% if current == 'pro' %}<span>{% if g.tenant.pro_until %}válido até <span class="mono">{{ g.tenant.pro_until|fmt_date }}</span>{% else %}sem vencimento{% endif %}</span>
+      {% elif g.tenant.plan == 'pro' and g.tenant.pro_until %}<span>o Pro venceu em <span class="mono">{{ g.tenant.pro_until|fmt_date }}</span></span>{% endif %}
+      <span><span class="mono">{{ nproc }}</span> processo{{ 's' if nproc != 1 }} · <span class="mono">{{ used|human_size }}</span> usados</span>
+    </div>
   </div>
 </div>
 
-<div class="planos">
-  <section class="cartao plano {{ 'atual' if current == 'free' }}">
-    <h2>Free {% if current == 'free' %}<span class="selo">Atual</span>{% endif %}</h2>
-    <div class="preco">R$ 0</div>
+<div class="plans">
+  <section class="card plan {{ 'current' if current == 'free' }}">
+    <div class="plan-head"><h2>Free</h2>{% if current == 'free' %}<span class="chip">Seu plano</span>{% endif %}</div>
+    <div class="price">R$ 0 <small>para sempre</small></div>
     <ul>{{ limites(plans.free) }}</ul>
   </section>
-  <section class="cartao plano destacado {{ 'atual' if current == 'pro' }}">
-    <h2>Pro <span class="selo pro">Recomendado</span>{% if current == 'pro' %} <span class="selo">Atual</span>{% endif %}</h2>
-    <div class="preco">{{ price|brl }} <small>/ {{ days }} dias</small></div>
+  <section class="card plan pro {{ 'current' if current == 'pro' }}">
+    <div class="plan-head"><h2>Pro</h2><span class="chip">{{ icon('wallet', 14) }}Pagamento via Pix</span>{% if current == 'pro' %}<span class="chip">Seu plano</span>{% endif %}</div>
+    <div class="price">{{ price|brl }} <small>a cada {{ days }} dias</small></div>
     <ul>{{ limites(plans.pro) }}</ul>
+    <div class="plan-cta">
     {% if pix_ok and price %}
-    <form method="post" action="{{ url_for('plan_pix') }}">
-      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-      <select name="periodos" aria-label="Período">
-        {% for n in [1, 3, 6, 12] %}<option value="{{ n }}">{{ n * days }} dias · {{ (price * n)|brl }}</option>{% endfor %}
-      </select>
-      <button class="botao pro">{{ 'Renovar' if current == 'pro' else 'Assinar' }} com Pix</button>
-    </form>
-    {% if current == 'pro' and g.tenant.pro_until %}<p class="sutil pequeno" style="margin:0">Renovando agora, os dias são somados ao vencimento atual.</p>{% endif %}
+      <form method="post" action="{{ url_for('plan_pix') }}" class="row">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <label class="sr-only" for="periodos">Período</label>
+        <select name="periodos" id="periodos" style="flex:1;width:auto">
+          {% for n in [1, 3, 6, 12] %}<option value="{{ n }}">{{ n * days }} dias · {{ (price * n)|brl }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary">{{ 'Renovar' if current == 'pro' else 'Assinar' }} com Pix</button>
+      </form>
+      {% if current == 'pro' and g.tenant.pro_until %}<p class="subtle small">Renovando agora, os dias são somados ao vencimento atual.</p>{% endif %}
     {% else %}
-    <p class="sutil pequeno" style="margin:0">O pagamento online ainda não está disponível. Fale com o administrador para liberar o Pro.</p>
+      <p class="subtle small">O pagamento online ainda não está disponível. Fale com o administrador para liberar o Pro.</p>
     {% endif %}
+    </div>
   </section>
 </div>
 
 {% if pays %}
-<div class="cartao">
-  <h2>Cobranças</h2>
-  <div class="tabela-caixa" style="box-shadow:none">
-  <table class="tabela">
-    <thead><tr><th>Criada em</th><th>Período</th><th>Valor</th><th>Situação</th><th></th></tr></thead>
+<section class="card card-flush" style="margin-top:var(--s-8)">
+  <div class="card-head"><h2>Cobranças</h2></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Criada em</th><th>Período</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead>
     <tbody>
     {% for p in pays %}
     <tr>
-      <td class="nowrap">{{ p.created_at|fmt_dt }}</td>
+      <td class="mono xsmall">{{ p.created_at|fmt_dt }}</td>
       <td>{{ p.days }} dias</td>
-      <td class="nowrap">{{ p.amount_cents|brl }}</td>
+      <td class="num">{{ p.amount_cents|brl }}</td>
       <td>{% include "_pay_status.html" %}</td>
-      <td>{% if p.status in ('pendente', 'informado') %}<a href="{{ url_for('payment', pay_id=p.id) }}">Abrir</a>{% endif %}</td>
+      <td class="right">{% if p.status in ('pendente', 'informado') %}<a class="btn btn-secondary btn-sm" href="{{ url_for('payment', pay_id=p.id) }}">Abrir</a>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
-</div>
+</section>
 {% endif %}
 {% endblock %}

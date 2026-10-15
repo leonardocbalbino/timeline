@@ -4,57 +4,102 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
-<title>{% block title %}Linha do Tempo de Provas{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
+<title>{% block fulltitle %}{% block title %}Íntegra{% endblock %} · Íntegra{% endblock %}</title>
+<script>document.documentElement.classList.add('js')</script>
+<link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+<link rel="icon" href="{{ url_for('static', filename='img/favicon-32.png') }}" sizes="32x32" type="image/png">
+<link rel="alternate icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=6">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% set ep = request.endpoint or '' %}
-{% if g.user %}
-<header class="topo">
-  <a class="marca" href="{{ url_for('index') }}"><span class="marca-icone"></span><span>Linha do Tempo</span></a>
-  <nav>
-    {% if g.tenant %}
-      <a href="{{ url_for('index') }}" class="{{ 'ativo' if ep in ('index', 'timeline', 'new', 'edit', 'process_new', 'process_edit') }}">Processos</a>
-      {% if has_feature('verificar') %}<a href="{{ url_for('verify') }}" class="{{ 'ativo' if ep == 'verify' }}">Verificar arquivo</a>{% endif %}
-      {% if has_feature('auditoria') %}<a href="{{ url_for('audit_log') }}" class="{{ 'ativo' if ep == 'audit_log' }}">Auditoria</a>{% endif %}
-      <a href="{{ url_for('plan') }}" class="{{ 'ativo' if ep in ('plan', 'payment') }}">Plano</a>
-    {% endif %}
-    {% if g.user.role == 'admin' and not g.impersonating %}
-      <a href="{{ url_for('admin_home') }}" class="{{ 'ativo' if ep in ('admin_home', 'admin_client', 'admin_client_new') }}">Clientes</a>
-      <a href="{{ url_for('admin_payments') }}" class="{{ 'ativo' if ep == 'admin_payments' }}">Pagamentos</a>
-      <a href="{{ url_for('admin_plans') }}" class="{{ 'ativo' if ep == 'admin_plans' }}">Planos e Pix</a>
-      <a href="{{ url_for('admin_audit') }}" class="{{ 'ativo' if ep == 'admin_audit' }}">Auditoria</a>
-    {% endif %}
-  </nav>
-  <div class="usuario">
-    {% if g.tenant %}{% set pl = effective_plan(g.tenant) %}<a href="{{ url_for('plan') }}" class="selo {{ pl }}">{{ PLAN_LABELS[pl] }}</a>{% endif %}
-    <a href="{{ url_for('account') }}" class="nome" title="Minha conta">{{ g.user.email }}</a>
-    <a href="{{ url_for('logout') }}">Sair</a>
+{% macro nav_link(endpoint, label, icon_name, active=()) -%}
+  <a href="{{ url_for(endpoint) }}" {% if request.endpoint == endpoint or request.endpoint in active %}aria-current="page"{% endif %}>{{ icon(icon_name, 16) }}{{ label }}</a>
+{%- endmacro %}
+{% macro user_menu() -%}
+  <details class="menu">
+    <summary aria-label="Menu da conta"><span class="avatar">{{ (g.user.name or g.user.email)|initials }}</span></summary>
+    <div class="menu-panel">
+      <div class="who-line">{{ g.user.email }}</div>
+      <a href="{{ url_for('account') }}">{{ icon('key', 16) }}Minha conta</a>
+      <a href="{{ url_for('logout') }}">{{ icon('log-out', 16) }}Sair</a>
+    </div>
+  </details>
+{%- endmacro %}
+
+{% block header %}
+{% if g.user and g.user.role == 'admin' and not g.impersonating %}
+<header class="app-header admin">
+  <div class="app-header-inner">
+    <a class="logo logo-dark" href="{{ url_for('admin_home') }}"><img src="{{ url_for('static', filename='img/logo-mark-dark.svg') }}" alt=""><span>íntegra</span></a>
+    <span class="tag-admin">ADMIN</span>
+    <nav class="app-nav" aria-label="Administração">
+      {{ nav_link('admin_home', 'Clientes', 'users', ('admin_client', 'admin_client_new')) }}
+      {{ nav_link('admin_payments', 'Pagamentos', 'wallet') }}
+      {{ nav_link('admin_plans', 'Planos e Pix', 'settings') }}
+      {{ nav_link('admin_audit', 'Auditoria', 'list') }}
+    </nav>
+    <div class="app-header-right">{{ user_menu() }}</div>
+  </div>
+</header>
+{% elif g.user and g.tenant %}
+<header class="app-header">
+  <div class="app-header-inner">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <nav class="app-nav" aria-label="Principal">
+      {{ nav_link('index', 'Processos', 'folder', ('timeline', 'new', 'edit', 'process_new', 'process_edit')) }}
+      {% if has_feature('verificar') %}{{ nav_link('verify', 'Verificar arquivo', 'shield-check') }}{% endif %}
+      {% if has_feature('auditoria') %}{{ nav_link('audit_log', 'Auditoria', 'list') }}{% endif %}
+      {{ nav_link('plan', 'Plano', 'credit-card', ('payment',)) }}
+    </nav>
+    <div class="app-header-right">
+      {% if effective_plan(g.tenant) == 'pro' %}<a href="{{ url_for('plan') }}" class="badge-pro">Pro</a>{% endif %}
+      {{ user_menu() }}
+    </div>
   </div>
 </header>
 {% if g.impersonating %}
-<div class="faixa-suporte">
-  <span>Modo suporte: você está dentro da conta de <strong>{{ g.tenant.name }}</strong>. Tudo que fizer aqui fica na auditoria.</span>
-  <form method="post" action="{{ url_for('admin_client_leave') }}">
-    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <button class="botao mini secundario">Voltar ao painel</button>
-  </form>
+<div class="support-banner" role="status">
+  <div class="container">
+    <span><strong>Modo suporte:</strong> você está na conta de <strong>{{ g.tenant.name }}</strong>. Tudo o que fizer aqui fica na auditoria.</span>
+    <form method="post" action="{{ url_for('admin_client_leave') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <button class="btn btn-secondary btn-sm">{{ icon('arrow-left', 16) }}Voltar ao painel</button>
+    </form>
+  </div>
 </div>
 {% endif %}
 {% elif g.share_token %}
-<header class="topo">
-  <span class="marca"><span class="marca-icone"></span><span>Linha do Tempo de Provas</span></span>
-  <nav></nav>
-  <div class="usuario"><span class="selo">Somente leitura</span></div>
+<header class="app-header share-header">
+  <div class="app-header-inner">
+    <span class="logo"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></span>
+    <span class="chip">{{ icon('lock', 14) }}Somente leitura</span>
+  </div>
 </header>
 {% endif %}
-<main>
-{% with msgs = get_flashed_messages(with_categories=true) %}
-  {% for cat, m in msgs %}<div class="aviso {{ cat }}">{{ m }}</div>{% endfor %}
-{% endwith %}
-{% block content %}{% endblock %}
+{% endblock %}
+
+{% block main %}
+<main class="page">
+  <div class="container">
+    {% include "_flashes.html" %}
+    {% block content %}{% endblock %}
+  </div>
 </main>
-<div id="lightbox" hidden><img alt=""><button type="button" aria-label="Fechar">×</button></div>
-<script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+{% endblock %}
+
+<div id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Imagem ampliada">
+  <img alt="">
+  <button type="button" class="lb-btn lb-close" aria-label="Fechar">{{ icon('x', 20) }}</button>
+  <button type="button" class="lb-btn lb-prev" aria-label="Imagem anterior">{{ icon('chevron-left', 20) }}</button>
+  <button type="button" class="lb-btn lb-next" aria-label="Próxima imagem">{{ icon('chevron-right', 20) }}</button>
+  <div class="lb-caption"></div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}?v=6"></script>
 </body>
 </html>

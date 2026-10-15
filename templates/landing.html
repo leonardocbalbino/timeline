@@ -1,154 +1,177 @@
 {% extends "base.html" %}
-{% block title %}Linha do Tempo de Provas · organize prints, áudios e vídeos para o seu processo{% endblock %}
+{% block fulltitle %}Íntegra · Provas em ordem, do fato ao processo{% endblock %}
 {% block meta %}<meta name="robots" content="index, follow">
-<meta name="description" content="Organize prints, áudios, vídeos e documentos em uma linha do tempo por processo, com hash SHA-256 de cada arquivo, relatório em PDF e link para o advogado.">{% endblock %}
+<meta name="description" content="Íntegra organiza prints, áudios, vídeos e documentos em uma linha do tempo por processo, com hash SHA-256 de cada arquivo, relatório em PDF e link para o advogado.">{% endblock %}
 {% block bodyclass %}landing{% endblock %}
-{% macro recursos(cfg) %}
-  <li>{% if cfg.max_processos|int %}{{ cfg.max_processos }} processo{{ 's' if cfg.max_processos|int > 1 }}{% else %}Processos ilimitados{% endif %}</li>
-  <li>{% if cfg.max_storage_mb|int %}{{ (cfg.max_storage_mb|int * 1048576)|human_size }} de armazenamento{% else %}Armazenamento ilimitado{% endif %}</li>
-  <li>Linha do tempo vertical e hash SHA-256 de cada arquivo</li>
-  {% for k, nome in FEATURES %}<li class="{{ '' if k in cfg.features else 'nao' }}">{{ nome }}</li>{% endfor %}
-{% endmacro %}
-{% block content %}
-<header class="lp-topo">
-  <div class="lp-largura lp-topo-linha">
-    <a class="marca" href="{{ url_for('index') }}"><span class="marca-icone"></span><span>Linha do Tempo de Provas</span></a>
-    <nav>
+{% block header %}
+<header class="lp-header">
+  <div class="lp-container">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <nav class="lp-nav" aria-label="Seções">
       <a href="#como-funciona">Como funciona</a>
       <a href="#recursos">Recursos</a>
       <a href="#precos">Preços</a>
       <a href="#duvidas">Dúvidas</a>
     </nav>
-    <div class="lp-topo-acoes">
-      <a href="{{ url_for('login') }}" class="lp-entrar">Entrar</a>
-      {% if signup_open %}<a href="{{ url_for('signup') }}" class="botao">Criar conta grátis</a>{% endif %}
+    <div class="lp-header-actions">
+      <a href="{{ url_for('login') }}" class="login-link">Entrar</a>
+      {% if signup_open %}<a href="{{ url_for('signup') }}" class="btn btn-dark">Criar conta grátis</a>
+      {% else %}<a href="{{ url_for('login') }}" class="btn btn-dark">Entrar</a>{% endif %}
     </div>
   </div>
 </header>
+{% endblock %}
+{% macro recursos(cfg) %}
+  <li>{{ icon('check') }}<span>{% if cfg.max_processos|int %}{{ cfg.max_processos }} processo{{ 's' if cfg.max_processos|int > 1 }}{% else %}Processos ilimitados{% endif %}</span></li>
+  <li>{{ icon('check') }}<span>{% if cfg.max_storage_mb|int %}{{ (cfg.max_storage_mb|int * 1048576)|human_size }} de armazenamento{% else %}Armazenamento ilimitado{% endif %}</span></li>
+  <li>{{ icon('check') }}<span>Linha do tempo vertical e hash SHA-256 de cada arquivo</span></li>
+  {% for k, nome in FEATURES %}<li class="{{ '' if k in cfg.features else 'off' }}">{{ icon('check' if k in cfg.features else 'x') }}<span>{{ nome }}</span></li>{% endfor %}
+{% endmacro %}
+{% block main %}
+<main>
+{% include "_flashes.html" %}
 
 <section class="lp-hero">
-  <div class="lp-largura lp-hero-grade">
+  <div class="lp-container lp-hero-grid">
     <div>
-      <span class="lp-etiqueta">Para quem precisa provar o que aconteceu</span>
-      <h1>As provas do seu caso em ordem, num lugar só, prontas para o advogado.</h1>
-      <p class="lp-lead">Junte prints, áudios do WhatsApp, vídeos e documentos em uma linha do tempo por data e hora. Cada arquivo recebe uma impressão digital (hash SHA-256) no envio, para mostrar que não foi alterado depois.</p>
-      <div class="acoes">
-        {% if signup_open %}<a href="{{ url_for('signup') }}" class="botao lp-cta">Começar grátis</a>{% endif %}
-        <a href="#precos" class="botao secundario lp-cta">Ver preços</a>
+      <span class="chip chip-verified">{{ icon('shield-check', 14) }}Cada arquivo com impressão digital SHA-256</span>
+      <h1>As provas do seu caso, em ordem e prontas para o advogado.</h1>
+      <p class="lp-lead">Junte prints, áudios do WhatsApp, vídeos e documentos em uma linha do tempo por data e hora. Cada arquivo recebe um hash no momento do envio, para mostrar que não foi alterado depois.</p>
+      <div class="row">
+        {% if signup_open %}<a href="{{ url_for('signup') }}" class="btn btn-primary btn-lg">Começar grátis</a>{% endif %}
+        <a href="#precos" class="btn btn-secondary btn-lg">Ver preços</a>
       </div>
-      <p class="lp-nota">Plano Free sem cartão e sem prazo. Faça o upgrade para o Pro via Pix quando precisar.</p>
+      <p class="lp-note">Plano Free sem cartão e sem prazo · Pro via Pix quando precisar</p>
     </div>
     <div class="lp-demo" aria-hidden="true">
-      <div class="lp-demo-dia">Terça-feira, 12 de março</div>
-      <div class="lp-demo-item">
-        <span class="lp-demo-hora">09:14</span>
-        <div class="lp-demo-card"><b>Mensagem confirmando o horário</b><small>WhatsApp · 2 prints</small>
-          <div class="lp-demo-thumbs"><i></i><i></i></div></div>
-      </div>
-      <div class="lp-demo-item destaque">
-        <span class="lp-demo-hora">14:02</span>
-        <div class="lp-demo-card"><b>★ Áudio com a ameaça</b><small>WhatsApp · áudio 0:48</small>
-          <div class="lp-demo-audio"><i></i></div></div>
-      </div>
-      <div class="lp-demo-item">
-        <span class="lp-demo-hora">18:30</span>
-        <div class="lp-demo-card"><b>Vídeo da câmera da portaria</b><small>Câmera de segurança · vídeo</small>
-          <code>SHA-256: 9f2c…e41a</code></div>
+      <header class="tl-day-head"><h2>Terça-feira, 12 de março</h2><span>3 registros</span></header>
+      <div>
+        <div class="tl-item">
+          <div class="tl-time">09:14</div><div class="tl-rail"></div>
+          <div class="card ev-card"><div class="ev-body">
+            <div class="ev-head"><h3>Mensagem confirmando o horário</h3></div>
+            <div class="ev-chips"><span class="chip">WhatsApp</span><span class="chip">{{ icon('image', 14) }}2 imagens</span></div>
+            <div class="lp-shots"><i></i><i></i></div>
+          </div></div>
+        </div>
+        <div class="tl-item destaque">
+          <div class="tl-time">14:02</div><div class="tl-rail"></div>
+          <div class="card ev-card destaque"><div class="ev-body">
+            <div class="ev-head"><h3>Áudio com a ameaça</h3></div>
+            <div class="ev-chips"><span class="chip chip-highlight">★ Destaque</span><span class="chip">{{ icon('mic', 14) }}0:48</span></div>
+            <div class="player"><span class="player-btn">{{ icon('play', 14) }}</span><span class="player-bar"><i></i></span><span class="player-time">0:18 / 0:48</span></div>
+          </div></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">18:30</div><div class="tl-rail"></div>
+          <div class="card ev-card"><div class="ev-body">
+            <div class="ev-head"><h3>Vídeo da câmera da portaria</h3></div>
+            <div class="ev-chips"><span class="chip">Câmera de segurança</span><span class="chip">{{ icon('video', 14) }}1 vídeo</span></div>
+          </div>
+          <div class="ev-foot"><div class="integrity">{{ icon('shield-check', 16) }}<span>Íntegro desde o envio · SHA-256 9f2c…e41a</span></div></div></div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="lp-secao" id="como-funciona">
-  <div class="lp-largura">
-    <h2 class="lp-titulo">Como funciona</h2>
-    <p class="lp-subtitulo">Em poucos minutos você sai de uma galeria bagunçada para uma cronologia que qualquer pessoa entende.</p>
-    <ol class="lp-passos">
-      <li><b>Crie um processo</b><span>Um para cada caso: trabalhista, família, consumidor, condomínio. Com número do processo, se já tiver.</span></li>
-      <li><b>Envie os arquivos</b><span>Arraste vários de uma vez. A data e a hora são sugeridas pelo nome do arquivo (WhatsApp, prints, câmera).</span></li>
-      <li><b>Descreva e destaque</b><span>Diga o que cada prova demonstra, quem está envolvido e marque as mais importantes.</span></li>
-      <li><b>Entregue ao advogado</b><span>Relatório para imprimir ou salvar em PDF, pacote ZIP com os originais ou um link somente leitura.</span></li>
+<section class="lp-section" id="como-funciona">
+  <div class="lp-container">
+    <span class="eyebrow">Como funciona</span>
+    <h2>Da galeria bagunçada a uma cronologia que qualquer pessoa entende.</h2>
+    <ol class="lp-steps">
+      <li><span class="n">01</span><h3>Crie um processo</h3><p>Um para cada caso: trabalhista, família, consumidor, condomínio. Com o número do processo, se já tiver.</p></li>
+      <li><span class="n">02</span><h3>Envie os arquivos</h3><p>Arraste vários de uma vez. A data e a hora são sugeridas pelo nome do arquivo (WhatsApp, prints, câmera).</p></li>
+      <li><span class="n">03</span><h3>Descreva e destaque</h3><p>Diga o que cada prova demonstra, quem está envolvido e marque as mais importantes.</p></li>
+      <li><span class="n">04</span><h3>Entregue ao advogado</h3><p>Relatório para imprimir ou salvar em PDF, pacote ZIP com os originais ou um link somente leitura.</p></li>
     </ol>
   </div>
 </section>
 
-<section class="lp-secao lp-alt" id="recursos">
-  <div class="lp-largura">
-    <h2 class="lp-titulo">Feito para prova, não só para guardar arquivo</h2>
-    <div class="lp-recursos">
-      <article><span class="lp-icone">⏱</span><h3>Linha do tempo por dia e hora</h3><p>Vertical ou horizontal, com player de áudio e vídeo, ampliação de imagens, filtros e busca.</p></article>
-      <article><span class="lp-icone">#</span><h3>Hash SHA-256 no envio</h3><p>Cada arquivo ganha um código único. Qualquer alteração, por menor que seja, muda o código.</p></article>
-      <article><span class="lp-icone">✔</span><h3>Verificação de integridade</h3><p>Envie uma cópia e confira na hora se ela é idêntica ao arquivo registrado.</p></article>
-      <article><span class="lp-icone">⎙</span><h3>Relatório cronológico</h3><p>Pronto para imprimir ou salvar em PDF, com data, hora, descrição e hash de cada prova.</p></article>
-      <article><span class="lp-icone">⬇</span><h3>Pacote ZIP com manifesto</h3><p>Todos os originais em ordem cronológica, mais uma planilha com os hashes para conferência.</p></article>
-      <article><span class="lp-icone">🔗</span><h3>Link para o advogado</h3><p>Acesso somente leitura ao processo, sem precisar criar conta. Você pode revogar quando quiser.</p></article>
-      <article><span class="lp-icone">☰</span><h3>Auditoria completa</h3><p>Entradas, envios, edições, exclusões, downloads e acessos pelo link ficam registrados com data e IP.</p></article>
-      <article><span class="lp-icone">🔒</span><h3>Privado por padrão</h3><p>Os arquivos só são entregues a quem está logado ou tem o link. Nada fica público nem é indexado.</p></article>
+<section class="lp-section lp-dark" id="recursos">
+  <div class="lp-container">
+    <span class="eyebrow">Recursos</span>
+    <h2>Feito para prova, não só para guardar arquivo.</h2>
+    <div class="lp-features">
+      <article>{{ icon('clock') }}<h3>Linha do tempo por dia e hora</h3><p>Vertical ou horizontal, com player de áudio e vídeo, ampliação de imagens, filtros e busca.</p></article>
+      <article>{{ icon('hash') }}<h3>Hash SHA-256 no envio</h3><p>Cada arquivo ganha um código único. Qualquer alteração, por menor que seja, muda o código.</p></article>
+      <article>{{ icon('shield-check') }}<h3>Verificação de integridade</h3><p>Envie uma cópia e confira na hora se ela é idêntica ao arquivo registrado.</p></article>
+      <article>{{ icon('printer') }}<h3>Relatório cronológico</h3><p>Pronto para imprimir ou salvar em PDF, com data, hora, descrição e hash de cada prova.</p></article>
+      <article>{{ icon('download') }}<h3>Pacote ZIP com manifesto</h3><p>Todos os originais em ordem cronológica, mais uma planilha com os hashes para conferência.</p></article>
+      <article>{{ icon('link') }}<h3>Link para o advogado</h3><p>Acesso somente leitura ao processo, sem precisar criar conta. Você revoga quando quiser.</p></article>
+      <article>{{ icon('list') }}<h3>Auditoria completa</h3><p>Entradas, envios, edições, exclusões, downloads e acessos pelo link ficam registrados com data e IP.</p></article>
+      <article>{{ icon('lock') }}<h3>Privado por padrão</h3><p>Os arquivos só são entregues a quem está logado ou tem o link. Nada fica público nem é indexado.</p></article>
     </div>
   </div>
 </section>
 
-<section class="lp-secao" id="precos">
-  <div class="lp-largura">
-    <h2 class="lp-titulo">Preços simples</h2>
-    <p class="lp-subtitulo">Comece grátis. Passe para o Pro quando o caso crescer ou quando precisar compartilhar com o advogado.</p>
-    <div class="planos lp-planos">
-      <section class="cartao plano">
-        <h2>Free</h2>
-        <div class="preco">R$ 0 <small>para sempre</small></div>
+<section class="lp-section lp-pricing" id="precos">
+  <div class="lp-container">
+    <span class="eyebrow">Preços</span>
+    <h2>Preços simples</h2>
+    <p class="lp-intro">Comece grátis. Passe para o Pro quando o caso crescer ou quando precisar compartilhar com o advogado.</p>
+    <div class="plans">
+      <section class="card plan">
+        <div class="plan-head"><h2>Free</h2></div>
+        <div class="price">R$ 0 <small>para sempre</small></div>
         <ul>{{ recursos(plans.free) }}</ul>
-        {% if signup_open %}<a href="{{ url_for('signup') }}" class="botao secundario">Criar conta grátis</a>{% endif %}
+        {% if signup_open %}<div class="plan-cta"><a href="{{ url_for('signup') }}" class="btn btn-secondary">Criar conta grátis</a></div>{% endif %}
       </section>
-      <section class="cartao plano destacado">
-        <h2>Pro <span class="selo pro">Mais completo</span></h2>
-        <div class="preco">{{ price|brl }} <small>a cada {{ days }} dias</small></div>
+      <section class="card plan pro">
+        <div class="plan-head"><h2>Pro</h2><span class="chip">{{ icon('wallet', 14) }}Pagamento via Pix</span></div>
+        <div class="price">{{ price|brl }} <small>a cada {{ days }} dias</small></div>
         <ul>{{ recursos(plans.pro) }}</ul>
-        {% if signup_open %}<a href="{{ url_for('signup') }}" class="botao pro">Começar e assinar o Pro</a>{% endif %}
-        <p class="sutil pequeno" style="margin:0">Pagamento via Pix, sem fidelidade. Pague 1, 3, 6 ou 12 períodos de uma vez. Se o Pro vencer, você volta ao Free sem perder nada.</p>
+        <div class="plan-cta">
+          {% if signup_open %}<a href="{{ url_for('signup') }}" class="btn btn-primary">Começar e assinar o Pro</a>{% endif %}
+          <p class="subtle small">Sem fidelidade. Pague 1, 3, 6 ou 12 períodos de uma vez. Se o Pro vencer, você volta ao Free sem perder nada.</p>
+        </div>
       </section>
     </div>
   </div>
 </section>
 
-<section class="lp-secao lp-alt" id="duvidas">
-  <div class="lp-largura lp-estreito">
-    <h2 class="lp-titulo">Dúvidas frequentes</h2>
+<section class="lp-section lp-bg" id="duvidas">
+  <div class="lp-container">
+    <span class="eyebrow">Dúvidas</span>
+    <h2>Perguntas frequentes</h2>
     <div class="lp-faq">
-      <details><summary>O hash garante que a prova vai ser aceita?</summary>
+      <details><summary>O hash garante que a prova vai ser aceita?{{ icon('chevron-down') }}</summary>
         <p>Não existe garantia de aceitação: quem decide é o juiz. O hash SHA-256 ajuda a demonstrar que o arquivo apresentado é exatamente o mesmo que foi enviado ao sistema naquela data, porque qualquer alteração muda o código. Converse com seu advogado sobre a melhor forma de apresentar as provas.</p></details>
-      <details><summary>Meus arquivos ficam públicos?</summary>
+      <details><summary>Meus arquivos ficam públicos?{{ icon('chevron-down') }}</summary>
         <p>Não. Os arquivos só são entregues a quem entrou na sua conta ou a quem tem o link somente leitura que você gerou. Você pode revogar o link a qualquer momento, e cada acesso fica registrado.</p></details>
-      <details><summary>O sistema altera ou comprime meus arquivos?</summary>
+      <details><summary>O sistema altera ou comprime meus arquivos?{{ icon('chevron-down') }}</summary>
         <p>Não. O arquivo é guardado exatamente como foi enviado, e o download devolve o original. Por isso o hash continua o mesmo.</p></details>
-      <details><summary>Que tipos de arquivo posso enviar?</summary>
+      <details><summary>Que tipos de arquivo posso enviar?{{ icon('chevron-down') }}</summary>
         <p>Imagens (prints, fotos), áudios (inclusive .opus do WhatsApp), vídeos, PDFs e textos. Cada envio aceita arquivos grandes, de até 4 GB.</p></details>
-      <details><summary>Como funciona o pagamento do Pro?</summary>
+      <details><summary>Como funciona o pagamento do Pro?{{ icon('chevron-down') }}</summary>
         <p>Dentro da conta, em “Plano”, você gera um Pix com QR Code ou copia e cola. Depois de pagar, clique em “Já paguei”. Assim que o pagamento é confirmado, o Pro é liberado pelo período escolhido. Não há renovação automática.</p></details>
-      <details><summary>E se eu parar de pagar?</summary>
+      <details><summary>E se eu parar de pagar?{{ icon('chevron-down') }}</summary>
         <p>Sua conta volta para o Free. Nenhuma prova é apagada: você só fica com os recursos e limites do Free até renovar.</p></details>
-      <details><summary>Meu advogado precisa criar conta?</summary>
+      <details><summary>Meu advogado precisa criar conta?{{ icon('chevron-down') }}</summary>
         <p>Não. No Pro, você gera um link somente leitura do processo e envia para ele. Pelo link dá para ver a linha do tempo, abrir o relatório e baixar os arquivos.</p></details>
     </div>
   </div>
 </section>
 
-<section class="lp-final">
-  <div class="lp-largura lp-estreito">
-    <h2>Comece a organizar suas provas hoje</h2>
-    <p>Quanto antes os arquivos estiverem registrados, melhor: a data de envio e o hash ficam guardados desde o primeiro dia.</p>
-    <div class="acoes" style="justify-content:center">
-      {% if signup_open %}<a href="{{ url_for('signup') }}" class="botao lp-cta">Criar conta grátis</a>{% endif %}
-      {% if contato %}<a href="mailto:{{ contato }}" class="botao secundario lp-cta">Falar com a gente</a>{% endif %}
-      {% if not signup_open and not contato %}<a href="{{ url_for('login') }}" class="botao lp-cta">Entrar</a>{% endif %}
+<section class="lp-section lp-cta-final">
+  <div class="lp-container">
+    <h2>Comece a organizar suas provas hoje.</h2>
+    <p class="lp-intro">Quanto antes os arquivos estiverem registrados, melhor: a data de envio e o hash ficam guardados desde o primeiro dia.</p>
+    <div class="row">
+      {% if signup_open %}<a href="{{ url_for('signup') }}" class="btn btn-primary btn-lg">Criar conta grátis</a>{% endif %}
+      {% if contato %}<a href="mailto:{{ contato }}" class="btn btn-secondary btn-lg">Falar com a gente</a>{% endif %}
+      {% if not signup_open and not contato %}<a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Entrar</a>{% endif %}
     </div>
-    {% if not signup_open %}<p class="lp-nota">Novas contas são criadas mediante contato{% if contato %}: <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %}.</p>{% endif %}
+    {% if not signup_open %}<p class="lp-note">Novas contas são criadas mediante contato{% if contato %}: <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %}.</p>{% endif %}
   </div>
 </section>
+</main>
 
-<footer class="lp-rodape">
-  <div class="lp-largura lp-rodape-linha">
-    <span>© {{ now_year }} Linha do Tempo de Provas</span>
-    <span>{% if contato %}<a href="mailto:{{ contato }}">{{ contato }}</a> · {% endif %}<a href="{{ url_for('login') }}">Entrar</a></span>
+<footer class="lp-footer">
+  <div class="lp-container">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <span>Organiza e preserva provas. Não substitui orientação jurídica.</span>
+    <span>© {{ now_year }} Íntegra{% if contato %} · <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %} · <a href="{{ url_for('login') }}">Entrar</a></span>
   </div>
 </footer>
 {% endblock %}
