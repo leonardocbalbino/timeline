@@ -65,6 +65,21 @@ Na primeira inicialização, as provas existentes vão para o cliente **“Conta
 `ADMIN_PASSWORD` e use “Acessar” nesse cliente. A senha `VIEWER_PASSWORD` deixa de existir:
 para o advogado, gere um link somente leitura em *Processo e link*.
 
+## Deploy automático
+
+Cada push no `main` roda `tests/smoke_test.py` no GitHub Actions e, se passar, atualiza o VPS
+via SSH executando `deploy/deploy.sh` (backup do banco em `data/backups/`, `git reset` para
+`origin/main`, `install.sh` e checagem de que o app respondeu).
+
+Segredos do repositório: `VPS_HOST`, `VPS_SSH_KEY` e `VPS_KNOWN_HOSTS` (opcional `VPS_USER`,
+padrão `root`). No servidor, a chave fica restrita a esse comando em `/root/.ssh/authorized_keys`:
+
+```
+restrict,command="sh /opt/timeline/deploy/deploy.sh" ssh-ed25519 AAAA... github-actions-timeline
+```
+
+Para atualizar manualmente: `sh /opt/timeline/deploy/deploy.sh`.
+
 ## Backup
 
 ```sh
