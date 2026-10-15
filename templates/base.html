@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
+{% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 <title>{% block title %}Linha do Tempo de Provas{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% set ep = request.endpoint or '' %}
@@ -55,6 +55,6 @@
 {% block content %}{% endblock %}
 </main>
 <div id="lightbox" hidden><img alt=""><button type="button" aria-label="Fechar">×</button></div>
-<script src="{{ url_for('static', filename='app.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
 </body>
 </html>

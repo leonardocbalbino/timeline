@@ -10,5 +10,8 @@
   <label>E-mail <input type="text" name="email" autofocus required autocomplete="username" autocapitalize="off"></label>
   <label>Senha <input type="password" name="senha" required autocomplete="current-password"></label>
   <button type="submit" class="botao">Entrar</button>
+  <p class="sutil pequeno" style="margin:0;text-align:center">
+    {% if signup_open %}Ainda não tem conta? <a href="{{ url_for('signup') }}">Crie grátis</a> · {% endif %}<a href="{{ url_for('index') }}">Conheça o sistema</a>
+  </p>
 </form>
 {% endblock %}

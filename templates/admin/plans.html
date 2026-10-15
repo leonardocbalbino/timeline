@@ -52,6 +52,15 @@
     <p class="sutil pequeno" style="margin:0">O sistema gera um QR Code e um “copia e cola” com o valor e um identificador para cada cobrança. O cliente avisa que pagou (com comprovante, se quiser) e você confirma em <a href="{{ url_for('admin_payments') }}">Pagamentos</a>, o que libera o Pro na hora.</p>
   </section>
 
+  <section class="cartao formulario">
+    <h2 style="margin:0">Página inicial e cadastro</h2>
+    <label class="check"><input type="checkbox" name="autocadastro" value="1" {% if s.autocadastro == '1' %}checked{% endif %}>
+      Permitir que visitantes criem conta sozinhos (entram no plano Free)</label>
+    <label>E-mail de contato exibido na página inicial <span class="ajuda">opcional</span>
+      <input type="email" name="contato_email" value="{{ s.contato_email }}" placeholder="contato@seudominio.com.br"></label>
+    <p class="sutil pequeno" style="margin:0">Os preços e recursos da <a href="{{ url_for('index') }}" target="_blank">página inicial</a> saem desta tela. Para ver como um visitante, abra numa janela anônima.</p>
+  </section>
+
   <div class="acoes"><button class="botao">Salvar</button></div>
 </form>
 {% endblock %}

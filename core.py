@@ -68,7 +68,8 @@ DEFAULT_PLANS = {
     "pro": {"features": [k for k, _ in FEATURES], "max_processos": 0, "max_storage_mb": 51200},
 }
 DEFAULT_SETTINGS = {"pix_chave": "", "pix_nome": "", "pix_cidade": "",
-                    "pro_preco": "49.90", "pro_dias": "30", "planos": ""}
+                    "pro_preco": "49.90", "pro_dias": "30", "planos": "",
+                    "autocadastro": "1", "contato_email": ""}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenants (
@@ -453,6 +454,17 @@ def load_user():
             flash("Sua conta está desativada. Fale com o administrador.", "erro")
             return
     g.user = u
+
+
+PUBLIC_PAGES = {"index", "signup", "static"}
+
+
+@app.after_request
+def robots(resp):
+    """Só a página inicial e o cadastro podem aparecer em buscadores."""
+    if request.endpoint not in PUBLIC_PAGES or g.get("user"):
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return resp
 
 
 def csrf_token():

@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import os
+import re
 import secrets
 import tempfile
 import time
@@ -42,12 +43,7 @@ def login():
                 flash("Sua conta está desativada. Fale com o administrador.", "erro")
                 return render_template("login.html"), 403
             _fails.pop(ip, None)
-            session.clear()
-            session.permanent = True
-            session["uid"] = u["id"]
-            session["pwv"] = password_fingerprint(u)
-            db().execute("UPDATE users SET last_login=? WHERE id=?", (now(), u["id"]))
-            g.user = u
+            start_session(u)
             audit("login", tenant_id=u["tenant_id"])
             nxt = request.args.get("next", "")
             if nxt.startswith("/") and not nxt.startswith("//"):
@@ -57,13 +53,88 @@ def login():
         _fails[ip] = fails
         time.sleep(1)
         flash("E-mail ou senha incorretos.", "erro")
-    return render_template("login.html")
+    return render_template("login.html", signup_open=signup_open())
+
+
+def start_session(u):
+    session.clear()
+    session.permanent = True
+    session["uid"] = u["id"]
+    session["pwv"] = password_fingerprint(u)
+    db().execute("UPDATE users SET last_login=? WHERE id=?", (now(), u["id"]))
+    db().commit()
+    g.user = u
 
 
 @app.route("/sair")
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+# ---------------------------------------------------------------- página inicial e autocadastro
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_signups = {}
+
+
+def signup_open():
+    return setting("autocadastro") == "1"
+
+
+def landing():
+    return render_template("landing.html", plans=plans(), price=_pro_price_cents(),
+                           days=_pro_days(), signup_open=signup_open(),
+                           contato=setting("contato_email"), now_year=today()[:4])
+
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def signup():
+    if g.user:
+        return redirect(url_for("index"))
+    if not signup_open():
+        flash("O cadastro está fechado no momento. Fale com a gente para criar sua conta.", "erro")
+        return redirect(url_for("index"))
+    form = {"nome": "", "email": ""}
+    if request.method == "POST":
+        form = {"nome": request.form.get("nome", "").strip()[:200],
+                "email": request.form.get("email", "").strip().lower()[:200]}
+        senha = request.form.get("senha", "")
+        ip = client_ip()
+        recentes = [t for t in _signups.get(ip, []) if time.time() - t < 3600]
+        erro = None
+        if request.form.get("site"):  # campo isca: só robôs preenchem
+            abort(400)
+        if len(recentes) >= 5:
+            erro = "Muitos cadastros a partir desta conexão. Tente novamente mais tarde."
+        elif not form["nome"]:
+            erro = "Informe seu nome."
+        elif not EMAIL_RE.match(form["email"]):
+            erro = "Informe um e-mail válido."
+        elif len(senha) < 8:
+            erro = "A senha precisa ter pelo menos 8 caracteres."
+        elif senha != request.form.get("confirma", ""):
+            erro = "A confirmação não confere com a senha."
+        elif not request.form.get("termos"):
+            erro = "É preciso aceitar as condições de uso."
+        elif db().execute("SELECT 1 FROM users WHERE email=?", (form["email"],)).fetchone():
+            erro = "Já existe uma conta com esse e-mail. Entre ou peça uma nova senha ao suporte."
+        if erro:
+            flash(erro, "erro")
+            return render_template("signup.html", form=form), 400
+        tid = db().execute("INSERT INTO tenants(name, plan, notes, created_at) VALUES (?, 'free', ?, ?)",
+                           (form["nome"], "Autocadastro pela página inicial.", now())).lastrowid
+        uid = db().execute("INSERT INTO users(tenant_id, email, name, password_hash, role, created_at) "
+                           "VALUES (?,?,?,?, 'cliente', ?)",
+                           (tid, form["email"], form["nome"], generate_password_hash(senha), now())).lastrowid
+        db().commit()
+        recentes.append(time.time())
+        _signups[ip] = recentes
+        start_session(db().execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())
+        g.tenant = db().execute("SELECT * FROM tenants WHERE id=?", (tid,)).fetchone()
+        audit("autocadastro", f"#{tid} {form['nome']} {form['email']}")
+        flash("Conta criada! Comece criando o seu primeiro processo.", "ok")
+        return redirect(url_for("index"))
+    return render_template("signup.html", form=form)
 
 
 @app.route("/conta", methods=["GET", "POST"])
@@ -91,8 +162,9 @@ def account():
 
 # ---------------------------------------------------------------- processos
 @app.route("/")
-@login_required
 def index():
+    if not g.user:
+        return landing()
     if g.user["role"] == "admin" and not g.impersonating:
         return redirect(url_for("admin_home"))
     tid = g.tenant["id"]

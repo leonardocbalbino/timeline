@@ -96,7 +96,7 @@ print("conta legada ok")
 form = {"csrf": tok, "pix_chave": "123.456.789-09", "pix_nome": "Leonardo Balbino", "pix_cidade": "São Paulo",
         "pro_preco": "49,90", "pro_dias": "30",
         "free_max_processos": "1", "free_max_storage_mb": "1", "free_relatorio": "1", "free_verificar": "1",
-        "pro_max_processos": "0", "pro_max_storage_mb": "0"}
+        "pro_max_processos": "0", "pro_max_storage_mb": "0", "autocadastro": "1"}
 for k in ["timeline_horizontal", "relatorio", "exportar", "verificar", "compartilhar", "auditoria"]:
     form[f"pro_{k}"] = "1"
 ok(adm.post("/admin/planos", data=form), 302)
@@ -195,8 +195,38 @@ ok(anon.get(f"/p/{token}"), 404)
 # desativa -> cliente é desconectado
 ok(adm.post(f"/admin/clientes/{tid}", data={"csrf": tok, "nome": "Maria Silva", "email": "maria@ex.com",
                                             "plano": "free"}), 302)
-r = cli.get("/"); ok(r, 302); assert "/login" in r.headers["Location"]
+html = ok(cli.get("/")); assert "Preços simples" in html  # desconectado -> landing
 print("compartilhamento e bloqueio ok")
+
+# landing e autocadastro
+anon2 = app.test_client()
+html = ok(anon2.get("/"))
+assert "R$ 49,90" in html and "Criar conta grátis" in html and 'content="index, follow"' in html
+r = anon2.get("/")
+assert "X-Robots-Tag" not in r.headers
+assert anon2.get("/login").headers["X-Robots-Tag"].startswith("noindex")
+ok(anon2.get("/cadastro"))
+c2 = csrf(anon2)
+base = {"csrf": c2, "nome": "João Souza", "email": "joao@ex.com", "senha": "segredo-123",
+        "confirma": "segredo-123", "termos": "1"}
+assert "e-mail válido" in ok(anon2.post("/cadastro", data={**base, "email": "x"}), 400)
+assert "condições de uso" in ok(anon2.post("/cadastro", data={k: v for k, v in base.items() if k != "termos"}), 400)
+ok(anon2.post("/cadastro", data={**base, "site": "spam"}), 400)
+r = anon2.post("/cadastro", data=base); ok(r, 302)
+html = ok(anon2.get("/"))
+assert "Conta criada" in html and "Nenhum processo ainda" in html
+row = conn.execute("SELECT t.plan, u.role FROM users u JOIN tenants t ON t.id=u.tenant_id WHERE u.email='joao@ex.com'").fetchone()
+assert row == ("free", "cliente"), row
+anon3 = app.test_client(); csrf(anon3)
+assert "Já existe uma conta" in ok(anon3.post("/cadastro", data={**base, "csrf": csrf(anon3)}), 400)
+# admin fecha o cadastro
+form["autocadastro"] = ""
+form["contato_email"] = "contato@ex.com"
+ok(adm.post("/admin/planos", data=form), 302)
+html = ok(anon3.get("/"))
+assert "Criar conta grátis" not in html and "contato@ex.com" in html
+ok(anon3.get("/cadastro"), 302)
+print("landing e autocadastro ok")
 
 # trocar senha do admin
 ok(adm.post("/conta", data={"csrf": tok, "atual": "senha-admin-123", "nova": "nova-senha-1", "confirma": "nova-senha-1"}), 302)

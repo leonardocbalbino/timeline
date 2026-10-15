@@ -197,13 +197,16 @@ def admin_plans():
         set_setting("planos", json.dumps(cfg))
         for key in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias"):
             set_setting(key, request.form.get(key, "").strip())
+        set_setting("autocadastro", "1" if request.form.get("autocadastro") else "0")
+        set_setting("contato_email", request.form.get("contato_email", "").strip()[:200])
         if setting("pix_chave"):
             set_setting("pix_chave", pix.normalizar_chave(setting("pix_chave")))
         db().commit()
         audit("admin_planos", json.dumps(cfg, ensure_ascii=False))
         flash("Planos e pagamento salvos.", "ok")
         return redirect(url_for("admin_plans"))
-    settings = {k: setting(k) for k in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias")}
+    settings = {k: setting(k) for k in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias",
+                                        "autocadastro", "contato_email")}
     return render_template("admin/plans.html", plans=plans(), s=settings)
 
 
