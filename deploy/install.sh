@@ -26,6 +26,18 @@ usermod -aG timeline www-data
 cp deploy/timeline.service /etc/systemd/system/timeline.service
 cp deploy/nginx.conf /etc/nginx/sites-available/timeline
 ln -sf /etc/nginx/sites-available/timeline /etc/nginx/sites-enabled/timeline
+# Domínio (processointegra.com.br) atrás do Cloudflare; HTTPS na origem só quando o certificado existir
+mkdir -p /etc/nginx/snippets /var/www/letsencrypt
+cp deploy/nginx-cloudflare.conf /etc/nginx/snippets/integra-cloudflare.conf
+cp deploy/nginx-app.conf /etc/nginx/snippets/integra-app.conf
+cp deploy/nginx-dominio.conf /etc/nginx/sites-available/timeline-dominio
+ln -sf /etc/nginx/sites-available/timeline-dominio /etc/nginx/sites-enabled/timeline-dominio
+if [ -f /etc/letsencrypt/live/processointegra.com.br/fullchain.pem ]; then
+  cp deploy/nginx-dominio-ssl.conf /etc/nginx/sites-available/timeline-dominio-ssl
+  ln -sf /etc/nginx/sites-available/timeline-dominio-ssl /etc/nginx/sites-enabled/timeline-dominio-ssl
+else
+  rm -f /etc/nginx/sites-enabled/timeline-dominio-ssl
+fi
 systemctl daemon-reload
 systemctl enable --now timeline >/dev/null
 systemctl restart timeline
