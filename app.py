@@ -21,6 +21,7 @@ from core import (DATA, UPLOADS, app, audit, client_ip, db, effective_plan, feat
                   unlink_upload)
 import asaas
 import billing
+import chunks
 import pix
 
 # ---------------------------------------------------------------- login
@@ -431,12 +432,17 @@ def new(pid):
         if not ev["title"]:
             flash("Informe um título.", "erro")
             return render_template("form.html", proc=proc, ev=request.form, files=[]), 400
+        try:
+            partes = chunks.claim(request.form.getlist("upload_id"))
+        except chunks.UploadError as e:
+            flash(str(e), "erro")
+            return render_template("form.html", proc=proc, ev=request.form, files=[]), 400
         cur = db().execute("INSERT INTO evidences(process_id, occurred_at, title, description, source, "
                            "people, important, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
                            (pid, ev["occurred_at"], ev["title"], ev["description"], ev["source"],
                             ev["people"], ev["important"], now(), now()))
         eid = cur.lastrowid
-        saved = save_uploads(eid, request.files.getlist("arquivos"))
+        saved = save_uploads(eid, request.files.getlist("arquivos")) + chunks.finalize(eid, partes)
         touch_process(pid)
         db().commit()
         audit("criar", f"processo #{pid} prova #{eid} {ev['occurred_at']} {ev['title']} | " + "; ".join(saved))
@@ -469,6 +475,11 @@ def edit(pid, eid):
         except ValueError:
             flash("Data ou hora inválida.", "erro")
             return redirect(url_for("edit", pid=pid, eid=eid))
+        try:
+            partes = chunks.claim(request.form.getlist("upload_id"))
+        except chunks.UploadError as e:
+            flash(str(e), "erro")
+            return redirect(url_for("edit", pid=pid, eid=eid))
         db().execute("UPDATE evidences SET occurred_at=?, title=?, description=?, source=?, "
                      "people=?, important=?, updated_at=? WHERE id=?",
                      (new_ev["occurred_at"], new_ev["title"] or ev["title"],
@@ -482,7 +493,7 @@ def edit(pid, eid):
                 db().execute("DELETE FROM files WHERE id=?", (fid,))
                 unlink_upload(f["stored_name"])
                 removed.append(f"{f['original_name']} sha256={f['sha256']}")
-        saved = save_uploads(eid, request.files.getlist("arquivos"))
+        saved = save_uploads(eid, request.files.getlist("arquivos")) + chunks.finalize(eid, partes)
         touch_process(pid)
         db().commit()
         changes = {k: (ev[k], v) for k, v in new_ev.items() if str(ev[k]) != str(v)}
@@ -535,17 +546,24 @@ def verify():
     result = None
     if request.method == "POST":
         up = request.files.get("arquivo")
-        if up and up.filename:
+        name = digest = None
+        if request.form.get("upload_id"):
+            try:
+                name, digest = chunks.hash_and_discard(request.form["upload_id"])
+            except chunks.UploadError as e:
+                flash(str(e), "erro")
+        elif up and up.filename:
             h = hashlib.sha256()
             for chunk in iter(lambda: up.stream.read(1024 * 1024), b""):
                 h.update(chunk)
-            digest = h.hexdigest()
+            name, digest = up.filename, h.hexdigest()
+        if digest:
             rows = db().execute("SELECT f.*, e.title, e.occurred_at, e.process_id, p.title AS proc_title "
                                 "FROM files f JOIN evidences e ON e.id = f.evidence_id "
                                 "JOIN processes p ON p.id = e.process_id "
                                 "WHERE f.sha256=? AND p.tenant_id=?",
                                 (digest, g.tenant["id"])).fetchall()
-            result = {"name": up.filename, "sha256": digest, "matches": rows}
+            result = {"name": name, "sha256": digest, "matches": rows}
     return render_template("verify.html", result=result)
 
 

@@ -411,6 +411,60 @@ html = ok(adm.get("/admin/planos"))
 assert "PAYMENT_RECEIVED" in html
 print("asaas ok")
 
+# ---------------------------------------------------------------- upload em partes
+import hashlib  # noqa: E402
+
+ok(ana.post("/processos/novo", data={"csrf": ca, "titulo": "Caso Ana"}), 302)
+pid_ana = conn.execute("SELECT id FROM processes WHERE tenant_id=?", (tid_ana,)).fetchone()[0]
+H = {"X-CSRF-Token": ca}
+conteudo = bytes(range(256)) * 80  # 20.480 bytes
+nome = "VID-20250105-WA0007.mp4"
+# sem token CSRF é recusado
+assert ana.post("/uploads/iniciar", json={"name": nome, "size": len(conteudo)}).status_code == 400
+assert ana.post("/uploads/iniciar", json={"name": "grande.mp4", "size": 5 * 1024 ** 3}, headers=H).status_code == 413
+r = ana.post("/uploads/iniciar", json={"name": nome, "size": len(conteudo), "mime": "video/mp4"}, headers=H)
+sid = r.get_json()["id"]
+parte = lambda off, dados: ana.post(f"/uploads/{sid}/parte?offset={off}", data=dados, headers=H,  # noqa: E731
+                                    content_type="application/octet-stream")
+assert parte(0, conteudo[:8000]).get_json()["received"] == 8000
+r = parte(9000, conteudo[9000:12000])                      # fora de ordem: servidor diz onde parou
+assert r.status_code == 409 and r.get_json()["received"] == 8000
+assert parte(4000, conteudo[4000:12000]).get_json()["received"] == 12000   # reenvio sobreposto
+# outro usuário não enxerga o envio
+assert anon2.post(f"/uploads/{sid}/parte?offset=12000", data=b"x", headers={"X-CSRF-Token": csrf(anon2)},
+                  content_type="application/octet-stream").status_code == 404
+# salvar com envio incompleto é recusado sem criar a prova
+html = ok(ana.post(f"/processos/{pid_ana}/provas/nova", data={"csrf": ca, "data": "2025-01-05", "titulo": "Vídeo",
+                                                              "upload_id": sid}), 400)
+assert "não terminou" in html
+assert conn.execute("SELECT COUNT(*) FROM evidences WHERE process_id=?", (pid_ana,)).fetchone()[0] == 0
+assert parte(12000, conteudo[12000:]).get_json()["received"] == len(conteudo)
+ok(ana.post(f"/processos/{pid_ana}/provas/nova", data={"csrf": ca, "data": "2025-01-05", "hora": "10:00",
+                                                       "titulo": "Vídeo da portaria", "upload_id": sid}), 302)
+f = rowd("SELECT f.* FROM files f JOIN evidences e ON e.id=f.evidence_id WHERE e.process_id=?", (pid_ana,))
+assert f["sha256"] == hashlib.sha256(conteudo).hexdigest() and f["size"] == len(conteudo) and f["kind"] == "video", f
+assert f["original_name"] == nome
+assert conn.execute("SELECT COUNT(*) FROM upload_sessions WHERE id=?", (sid,)).fetchone()[0] == 0
+assert not os.path.exists(os.path.join(data, "partes", f"{sid}.part"))
+r = ana.get(f"/arquivo/{f['id']}"); assert r.status_code == 200 and r.data == conteudo; r.close()
+# o mesmo envio não pode ser reaproveitado
+assert "expirou" in ok(ana.post(f"/processos/{pid_ana}/provas/nova", data={"csrf": ca, "data": "2025-01-05",
+                                                                          "titulo": "x", "upload_id": sid}), 400)
+# verificação em partes: confere o hash e apaga o temporário
+r = ana.post("/uploads/iniciar", json={"name": "copia.mp4", "size": len(conteudo), "purpose": "verificar"}, headers=H)
+vid = r.get_json()["id"]
+ana.post(f"/uploads/{vid}/parte?offset=0", data=conteudo, headers=H, content_type="application/octet-stream")
+assert "Arquivo íntegro" in ok(ana.post("/verificar", data={"csrf": ca, "upload_id": vid}))
+assert not os.path.exists(os.path.join(data, "partes", f"{vid}.part"))
+# envio para verificação não serve como prova
+r = ana.post("/uploads/iniciar", json={"name": "v.mp4", "size": 3, "purpose": "verificar"}, headers=H)
+vid2 = r.get_json()["id"]
+ana.post(f"/uploads/{vid2}/parte?offset=0", data=b"abc", headers=H, content_type="application/octet-stream")
+assert "expirou" in ok(ana.post(f"/processos/{pid_ana}/provas/nova", data={"csrf": ca, "data": "2025-01-05",
+                                                                          "titulo": "x", "upload_id": vid2}), 400)
+print("upload em partes ok")
+
+
 # trocar senha do admin
 ok(adm.post("/conta", data={"csrf": tok, "atual": "senha-admin-123", "nova": "nova-senha-1", "confirma": "nova-senha-1"}), 302)
 ok(adm.get("/admin"))
@@ -419,7 +473,7 @@ assert "Auditoria" in ok(adm.get("/admin/auditoria"))
 ok(adm.post(f"/admin/clientes/{tid}/excluir", data={"csrf": tok, "confirmar": "Maria Silva"}), 302)
 assert conn.execute("SELECT COUNT(*) FROM processes WHERE tenant_id=?", (tid,)).fetchone()[0] == 0
 left = sorted(os.listdir(os.path.join(data, "uploads")))
-assert left == ["legacy.png"], left
+assert left == sorted(["legacy.png", f["stored_name"]]), left  # sobram só os da conta legada e da Ana
 print("exclusão ok")
 
 conn.close()

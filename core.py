@@ -173,6 +173,16 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     canceled_at TEXT,
     canceled_by TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS upload_sessions (
+    id TEXT PRIMARY KEY,                        -- envio em partes (ver chunks.py)
+    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL,
+    purpose TEXT NOT NULL DEFAULT 'prova',      -- prova | verificar
+    original_name TEXT NOT NULL,
+    mime TEXT NOT NULL DEFAULT '',
+    size INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS webhook_events (
     id TEXT PRIMARY KEY,                        -- id do evento no Asaas (idempotência)
     event TEXT NOT NULL,
@@ -535,7 +545,8 @@ def csrf_token():
 @app.before_request
 def check_csrf():
     if request.method == "POST" and request.endpoint not in ("login", "asaas_webhook"):
-        if request.form.get("csrf") != session.get("csrf"):
+        token = request.form.get("csrf") or request.headers.get("X-CSRF-Token")
+        if not token or token != session.get("csrf"):
             abort(400, "Token de segurança inválido. Recarregue a página.")
 
 

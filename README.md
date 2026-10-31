@@ -20,6 +20,8 @@ em uma linha do tempo por processo, dia e horário, para apresentação ao jurí
 - Vários arquivos por registro, com título, descrição, origem (WhatsApp, Instagram...), pessoas envolvidas e destaque.
 - Data e hora sugeridas pelo nome do arquivo (padrões do WhatsApp, `Screenshot_…`, `IMG_…`, `VID_…`).
 - **Hash SHA-256** de cada arquivo calculado no envio, para provar que ele não foi alterado.
+- **Envio em partes** de 16 MB, com retomada automática: arquivos de até 4 GB passam pelo Cloudflare
+  (que recusa requisições acima de 100 MB). O hash é calculado sobre o arquivo inteiro, já montado no servidor.
 - **Verificar arquivo**: confere se uma cópia é idêntica ao arquivo registrado.
 - **Relatório** pronto para imprimir ou salvar em PDF.
 - **Pacote ZIP** com todos os originais em ordem cronológica, mais `manifesto.csv` com os hashes.

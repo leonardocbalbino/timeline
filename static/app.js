@@ -284,6 +284,91 @@
     setTimeout(consultar, 8000);
   }
 
+  // ------------------------------------------------------------ upload em partes
+  // O Cloudflare recusa requisições acima de 100 MB: cada arquivo vai em pedaços, com retomada.
+  var podeEmPartes = !!(window.fetch && window.Promise && window.FormData && window.Blob && Blob.prototype.slice);
+
+  function iniciarEnvio(file, purpose, csrf) {
+    return fetch('/uploads/iniciar', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, Accept: 'application/json' },
+      body: JSON.stringify({ name: file.name, size: file.size, mime: file.type, purpose: purpose })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || 'Não foi possível iniciar o envio (' + r.status + ').');
+        return j;
+      });
+    });
+  }
+
+  function enviarEmPartes(file, purpose, csrf, onProgress) {
+    return iniciarEnvio(file, purpose, csrf).then(function (s) {
+      var tamanho = s.chunk_size, offset = 0, tentativas = 0;
+      return new Promise(function (resolve, reject) {
+        function falha() {
+          if (++tentativas > 6) { reject(new Error('Falha de conexão ao enviar “' + file.name + '”. Tente novamente.')); return; }
+          setTimeout(proxima, 1000 * Math.pow(2, tentativas - 1));
+        }
+        function proxima() {
+          if (offset >= file.size) { resolve(s.id); return; }
+          var fim = Math.min(offset + tamanho, file.size);
+          var xhr = new XMLHttpRequest();
+          xhr.open('POST', '/uploads/' + s.id + '/parte?offset=' + offset);
+          xhr.setRequestHeader('X-CSRF-Token', csrf);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.upload.onprogress = function (p) { onProgress(offset + p.loaded); };
+          xhr.onload = function () {
+            var j = {};
+            try { j = JSON.parse(xhr.responseText); } catch (err) { /* resposta não-JSON */ }
+            if ((xhr.status === 200 || xhr.status === 409) && typeof j.received === 'number') {
+              if (j.received > offset) tentativas = 0;
+              else if (++tentativas > 6) { reject(new Error('O envio de “' + file.name + '” não avança. Tente novamente.')); return; }
+              offset = j.received;
+              onProgress(offset);
+              proxima();
+            } else if (xhr.status === 0 || xhr.status >= 500 || xhr.status === 408 || xhr.status === 429) {
+              falha();
+            } else {
+              reject(new Error(j.error || 'Erro ao enviar “' + file.name + '” (' + xhr.status + ').'));
+            }
+          };
+          xhr.onerror = falha;
+          xhr.ontimeout = falha;
+          xhr.send(file.slice(offset, fim));
+        }
+        proxima();
+      });
+    });
+  }
+
+  // Verificar arquivo: envia em partes e só então manda o formulário (que leva o id do envio)
+  var formVerificar = document.getElementById('form-verificar');
+  if (formVerificar && podeEmPartes) {
+    formVerificar.addEventListener('submit', function (e) {
+      var campo = formVerificar.querySelector('input[type=file]');
+      if (!campo.files.length || formVerificar.querySelector('[name=upload_id]')) return;
+      e.preventDefault();
+      var f = campo.files[0];
+      var nome = formVerificar.querySelector('[data-dropzone-nome]');
+      var botao = formVerificar.querySelector('button');
+      botao.disabled = true;
+      enviarEmPartes(f, 'verificar', formVerificar.querySelector('[name=csrf]').value, function (bytes) {
+        nome.textContent = 'Enviando “' + f.name + '”… ' + Math.floor(bytes / f.size * 100) + '%';
+      }).then(function (id) {
+        nome.textContent = 'Calculando o SHA-256…';
+        var h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'upload_id'; h.value = id;
+        formVerificar.appendChild(h);
+        campo.disabled = true; // o arquivo já está no servidor
+        formVerificar.submit();
+      }).catch(function (err) {
+        alert(err.message);
+        botao.disabled = false;
+        nome.textContent = f.name + ' · ' + humanSize(f.size);
+      });
+    });
+  }
+
   // ------------------------------------------------------------ formulário de prova
   var form = document.getElementById('form-prova');
   if (!form) return;
@@ -382,29 +467,51 @@
   });
   drop.addEventListener('drop', function (e) { input.files = e.dataTransfer.files; update(); });
 
-  // Envio com barra de progresso (arquivos grandes)
+  // Envio com barra de progresso: arquivos em partes (Cloudflare) e depois o formulário com os ids
   form.addEventListener('submit', function (e) {
-    if (!input.files.length || !window.FormData) return;
+    if (!input.files.length || !podeEmPartes) return; // sem suporte: envio direto do formulário
     e.preventDefault();
-    var fd = new FormData(form);
-    if (e.submitter && e.submitter.name) fd.append(e.submitter.name, e.submitter.value);
+    var submitter = e.submitter;
+    var csrf = form.querySelector('[name=csrf]').value;
+    var files = Array.prototype.slice.call(input.files);
+    var total = files.reduce(function (t, f) { return t + f.size; }, 0) || 1;
+    var feito = 0, ids = [];
     var box = document.getElementById('progresso');
     var bar = box.querySelector('div'), label = box.querySelector('span');
+    var botoes = form.querySelectorAll('button');
     box.hidden = false;
-    form.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', form.action || location.href);
-    xhr.upload.onprogress = function (p) {
-      if (!p.lengthComputable) return;
-      var pc = Math.round(p.loaded / p.total * 100);
+    botoes.forEach(function (b) { b.disabled = true; });
+    var mostrar = function (bytes, nome) {
+      var pc = Math.min(100, Math.floor((feito + bytes) / total * 100));
       bar.style.width = pc + '%';
-      label.textContent = pc < 100 ? 'Enviando… ' + pc + '%' : 'Calculando hash e salvando…';
+      label.textContent = 'Enviando ' + nome + '… ' + pc + '%';
     };
-    xhr.onload = function () {
-      if (xhr.status < 400) { location.href = xhr.responseURL; }
-      else { alert('Erro ao enviar (' + xhr.status + '): ' + xhr.responseText.slice(0, 300)); location.reload(); }
-    };
-    xhr.onerror = function () { alert('Falha de conexão durante o envio. Tente novamente.'); location.reload(); };
-    xhr.send(fd);
+    files.reduce(function (cadeia, f) {
+      return cadeia.then(function () {
+        return enviarEmPartes(f, 'prova', csrf, function (b) { mostrar(b, f.name); }).then(function (id) {
+          ids.push(id);
+          feito += f.size;
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      bar.style.width = '100%';
+      label.textContent = 'Calculando hash e salvando…';
+      var fd = new FormData(form);
+      fd.delete('arquivos');
+      ids.forEach(function (id) { fd.append('upload_id', id); });
+      if (submitter && submitter.name) fd.append(submitter.name, submitter.value);
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action || location.href);
+      xhr.onload = function () {
+        if (xhr.status < 400) { location.href = xhr.responseURL; }
+        else { alert('Erro ao salvar (' + xhr.status + '). Os arquivos enviados ficam guardados por 24 horas; tente salvar de novo.'); location.reload(); }
+      };
+      xhr.onerror = function () { alert('Falha de conexão ao salvar. Tente novamente.'); location.reload(); };
+      xhr.send(fd);
+    }).catch(function (err) {
+      alert(err.message);
+      box.hidden = true;
+      botoes.forEach(function (b) { b.disabled = false; });
+    });
   });
 })();
