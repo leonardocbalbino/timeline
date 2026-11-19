@@ -12,7 +12,7 @@ from datetime import datetime
 from flask import abort, g, jsonify, request
 
 import asaas
-from core import add_days, app, audit, db, grant_pro, now, revoke_pro, setting, today
+from core import add_days, app, audit, db, grant_pro, now, revoke_pro, setting, today, unlink_upload
 
 PAID = {"RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH", "DUNNING_RECEIVED"}
 REVERSED = {"REFUNDED", "REFUND_REQUESTED", "REFUND_IN_PROGRESS", "CHARGEBACK_REQUESTED",
@@ -347,3 +347,21 @@ def asaas_webhook():
         db().execute("UPDATE webhook_events SET error=? WHERE id=?", (err[:1000], event_id))
         db().commit()
     return jsonify(received=True)
+
+
+# ---------------------------------------------------------------- exclusão de conta
+def delete_tenant(tenant_id, by):
+    """Apaga o cliente e todos os dados (processos, provas, arquivos, pagamentos, sessões do app).
+    Cancela antes as assinaturas no Asaas, para ninguém continuar sendo cobrado."""
+    for sub in db().execute("SELECT * FROM subscriptions WHERE tenant_id=? AND status='ativa'", (tenant_id,)).fetchall():
+        cancel_subscription(sub, by)  # BillingError interrompe a exclusão
+    stored = [r[0] for r in db().execute(
+        "SELECT f.stored_name FROM files f JOIN evidences e ON e.id = f.evidence_id "
+        "JOIN processes p ON p.id = e.process_id WHERE p.tenant_id=?", (tenant_id,))]
+    stored += [r[0] for r in db().execute(
+        "SELECT receipt_stored FROM payments WHERE tenant_id=? AND receipt_stored IS NOT NULL", (tenant_id,))]
+    db().execute("DELETE FROM tenants WHERE id=?", (tenant_id,))
+    db().commit()
+    for s in stored:
+        unlink_upload(s)
+    return len(stored)

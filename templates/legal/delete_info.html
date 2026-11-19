@@ -1,0 +1,33 @@
+{% extends "legal/_layout.html" %}
+{% block title %}Excluir conta{% endblock %}
+{% block legal %}
+<span class="eyebrow">Íntegra</span>
+<h1 style="margin:var(--s-3) 0 var(--s-6)">Como excluir sua conta</h1>
+<div class="legal-text">
+<p>Você pode excluir sua conta do Íntegra e todos os dados dela a qualquer momento, sem precisar falar com ninguém.</p>
+
+<h2>Pelo aplicativo (Android ou iPhone)</h2>
+<ol>
+  <li>Abra o app e entre na sua conta.</li>
+  <li>Toque em <strong>Conta</strong> e depois em <strong>Excluir minha conta</strong>.</li>
+  <li>Confirme com a sua senha.</li>
+</ol>
+
+<h2>Pelo site</h2>
+<ol>
+  <li>Entre em <a href="{{ url_for('login') }}">processointegra.com.br</a>.</li>
+  <li>Clique no seu avatar, em <strong>Minha conta</strong> e depois em <strong>Excluir minha conta</strong>.</li>
+  <li>Confirme com a sua senha e digitando <code>EXCLUIR</code>.</li>
+</ol>
+
+<h2>O que é apagado</h2>
+<ul>
+  <li>Na hora: todos os processos, provas, arquivos, links de compartilhamento, sessões do app e o cadastro.</li>
+  <li>A assinatura do Pro, se houver, é cancelada junto, sem novas cobranças.</li>
+  <li>Cópias de segurança do banco de dados são descartadas automaticamente em até 30 dias.</li>
+  <li>Ficam guardados apenas os registros que a lei obriga: registros de acesso (6 meses, Marco Civil da Internet) e registros de pagamentos mantidos pelo Asaas para fins fiscais.</li>
+</ul>
+<p>Antes de excluir, baixe o pacote ZIP de cada processo se quiser guardar os arquivos originais e os hashes.</p>
+{% if contato %}<p>Não consegue entrar na conta? Escreva para <a href="mailto:{{ contato }}">{{ contato }}</a> a partir do e-mail cadastrado e pediremos a confirmação antes de excluir.</p>{% endif %}
+</div>
+{% endblock %}

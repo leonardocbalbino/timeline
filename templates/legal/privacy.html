@@ -1,0 +1,60 @@
+{% extends "legal/_layout.html" %}
+{% block title %}Política de privacidade{% endblock %}
+{% block legal %}
+<span class="eyebrow">Íntegra</span>
+<h1 style="margin:var(--s-3) 0 var(--s-6)">Política de privacidade</h1>
+<div class="legal-text">
+<p>Esta política explica quais dados o Íntegra (site <strong>processointegra.com.br</strong> e aplicativos para Android e iOS) trata, para quê e quais são os seus direitos, nos termos da Lei Geral de Proteção de Dados (Lei 13.709/2018 — LGPD).</p>
+
+<h2>1. Quem é o controlador</h2>
+<p>O controlador dos dados de cadastro e uso da plataforma é {% if empresa_nome %}<strong>{{ empresa_nome }}</strong>{% if empresa_doc %}, inscrito(a) sob o nº {{ empresa_doc }}{% endif %}{% else %}o responsável pelo Íntegra{% endif %}{% if contato %}, que pode ser contatado pelo e-mail <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %}.</p>
+<p>Quanto ao <strong>conteúdo das provas</strong> (arquivos e descrições que você envia), quem decide o que é enviado e para quê é você: nesse caso você é o controlador e o Íntegra atua como <strong>operador</strong>, guardando e organizando esse conteúdo apenas para prestar o serviço a você.</p>
+
+<h2>2. Dados que tratamos</h2>
+<ul>
+  <li><strong>Cadastro:</strong> nome, e-mail, senha (guardada apenas como hash), e, quando você assina o plano Pro pelo Asaas, CPF ou CNPJ e telefone.</li>
+  <li><strong>Conteúdo enviado por você:</strong> prints, áudios, vídeos, documentos, títulos, descrições, datas, origem e pessoas envolvidas. Esse conteúdo pode conter dados pessoais de terceiros e dados sensíveis; você é responsável por tê-los obtido de forma lícita.</li>
+  <li><strong>Integridade:</strong> o código SHA-256 de cada arquivo, a data e a hora do envio.</li>
+  <li><strong>Uso e segurança:</strong> endereço IP, data e hora de acessos, ações realizadas (registro de auditoria), modelo do aparelho no app e cookie de sessão do site.</li>
+  <li><strong>Pagamentos:</strong> valores, datas e situação das cobranças. Dados de cartão são digitados e processados diretamente pelo Asaas; o Íntegra não os recebe.</li>
+</ul>
+
+<h2>3. Para que usamos e com que base legal</h2>
+<ul>
+  <li>Prestar o serviço contratado: guardar, organizar, exibir, exportar e verificar suas provas — <em>execução de contrato</em> (art. 7º, V).</li>
+  <li>Cobrar o plano Pro e emitir cobranças — <em>execução de contrato</em> e <em>cumprimento de obrigação legal</em> (art. 7º, II e V).</li>
+  <li>Registrar acessos e ações para segurança, prevenção a fraudes e prova de integridade do próprio serviço — <em>legítimo interesse</em> (art. 7º, IX) e guarda de registros de acesso exigida pelo Marco Civil da Internet (Lei 12.965/2014, art. 15).</li>
+  <li>Responder a pedidos de suporte e avisos sobre a conta — <em>execução de contrato</em>.</li>
+</ul>
+<p>Não vendemos dados, não usamos o conteúdo das suas provas para publicidade nem para treinar modelos, e não usamos cookies de rastreamento ou publicidade.</p>
+
+<h2>4. Com quem compartilhamos</h2>
+<ul>
+  <li><strong>Asaas Gestão Financeira</strong> — processamento de cobranças (Pix, boleto e cartão), quando você assina o Pro.</li>
+  <li><strong>Cloudflare</strong> — proteção e entrega do site (os dados passam pela rede da Cloudflare, inclusive fora do Brasil).</li>
+  <li><strong>Provedor de servidores</strong> — hospedagem do sistema e dos arquivos; os servidores podem estar localizados fora do Brasil.</li>
+  <li><strong>Quem você autorizar:</strong> pessoas com quem você compartilhar um link somente leitura de um processo (por exemplo, seu advogado).</li>
+  <li><strong>Autoridades</strong>, quando houver ordem judicial ou obrigação legal.</li>
+</ul>
+<p>Transferências internacionais seguem o art. 33 da LGPD, com fornecedores que adotam garantias de proteção compatíveis.</p>
+
+<h2>5. Por quanto tempo guardamos</h2>
+<ul>
+  <li>Cadastro e conteúdo: enquanto a conta existir. Ao excluir a conta, os arquivos de provas são apagados na hora e os demais dados saem do banco imediatamente; cópias de segurança do banco são descartadas automaticamente em até 30 dias.</li>
+  <li>Registros de acesso: pelo menos 6 meses, conforme o Marco Civil da Internet.</li>
+  <li>Registros de pagamentos: pelo prazo exigido pela legislação fiscal (até 5 anos), mantidos pelo Asaas.</li>
+</ul>
+
+<h2>6. Segurança</h2>
+<p>Usamos conexão criptografada (HTTPS), senhas guardadas com hash, isolamento entre contas, arquivos acessíveis somente com login ou link autorizado, registro de auditoria e o hash SHA-256 de cada arquivo para demonstrar que ele não foi alterado. Nenhum sistema é totalmente imune a falhas; em caso de incidente relevante, comunicaremos você e a ANPD nos termos da lei.</p>
+
+<h2>7. Seus direitos</h2>
+<p>Você pode, a qualquer momento: confirmar se tratamos seus dados, acessá-los, corrigi-los, pedir a portabilidade (o pacote ZIP de cada processo traz todos os arquivos originais e um manifesto), pedir a eliminação, saber com quem compartilhamos e revogar consentimentos (art. 18 da LGPD). A exclusão da conta pode ser feita por você mesmo — veja <a href="{{ url_for('account_delete_info') }}">como excluir sua conta</a>.{% if contato %} Para os demais pedidos, escreva para <a href="mailto:{{ contato }}">{{ contato }}</a>.{% endif %} Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</p>
+
+<h2>8. Crianças e adolescentes</h2>
+<p>O Íntegra não é destinado a menores de 18 anos. Se o conteúdo das provas envolver crianças ou adolescentes, o tratamento deve atender ao melhor interesse deles (art. 14 da LGPD), sob responsabilidade de quem envia.</p>
+
+<h2>9. Mudanças nesta política</h2>
+<p>Podemos atualizar esta política. Mudanças relevantes serão avisadas no site ou no app antes de entrarem em vigor.</p>
+</div>
+{% endblock %}

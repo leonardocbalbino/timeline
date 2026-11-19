@@ -623,3 +623,9 @@ audio { width: 100%; }
 .segmented .seg-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .segmented .seg-opt:has(input:checked) { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(14,26,43,.12); }
 .segmented .seg-opt:has(input:focus-visible) { outline: 2px solid var(--action); outline-offset: 2px; }
+
+/* páginas jurídicas */
+.legal-text { display: grid; gap: var(--s-4); font-size: 16px; line-height: 1.7; color: var(--text-muted); }
+.legal-text h2 { font-size: 20px; margin-top: var(--s-4); color: var(--ink); }
+.legal-text strong { color: var(--ink); }
+.legal-text ul, .legal-text ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }

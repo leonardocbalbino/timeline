@@ -464,6 +464,99 @@ assert "expirou" in ok(ana.post(f"/processos/{pid_ana}/provas/nova", data={"csrf
                                                                           "titulo": "x", "upload_id": vid2}), 400)
 print("upload em partes ok")
 
+# ---------------------------------------------------------------- API do app
+for path in ("/privacidade", "/termos", "/excluir-conta"):
+    html = ok(app.test_client().get(path))
+    assert "Íntegra" in html and "noindex" not in app.test_client().get(path).headers.get("X-Robots-Tag", "")
+assert 'property="og:image"' in ok(app.test_client().get("/"))
+
+api = app.test_client()
+assert api.post("/api/v1/login", json={"email": "ana@ex.com", "senha": "errada"}).status_code == 401
+assert api.post("/api/v1/login", json={"email": "admin", "senha": "nova-senha-1"}).status_code in (401, 403)
+r = api.post("/api/v1/login", json={"email": "ana@ex.com", "senha": "senha-ana-123", "device": "Pixel 8"})
+assert r.status_code == 200, r.get_data(as_text=True)
+TOKEN = r.get_json()["token"]
+assert r.get_json()["account"]["plan"] == "pro" and r.get_json()["features"]["verificar"] is True
+A = {"Authorization": f"Bearer {TOKEN}"}
+assert api.get("/api/v1/me").status_code == 401
+assert api.get("/api/v1/me", headers={"Authorization": "Bearer invalido"}).status_code == 401
+me = api.get("/api/v1/me", headers=A).get_json()
+assert me["user"]["email"] == "ana@ex.com"
+procs = api.get("/api/v1/processos", headers=A).get_json()["processes"]
+assert any(p["title"] == "Caso Ana" for p in procs)
+r = api.post("/api/v1/processos", json={"titulo": "Pelo app", "numero": "123"}, headers=A)
+assert r.status_code == 201
+papp = r.get_json()["process"]["id"]
+# upload em partes com token, sem cookie nem CSRF
+foto = b"\x89PNG" + bytes(5000)
+r = api.post("/uploads/iniciar", json={"name": "IMG-20251110-WA0001.jpg", "size": len(foto), "mime": "image/jpeg"},
+             headers=A)
+assert r.status_code == 200, r.get_data(as_text=True)
+up = r.get_json()["id"]
+assert api.post(f"/uploads/{up}/parte?offset=0", data=foto, headers=A,
+                content_type="application/octet-stream").get_json()["received"] == len(foto)
+r = api.post(f"/api/v1/processos/{papp}/provas", headers=A, json={
+    "data": "2025-11-10", "hora": "08:15", "titulo": "Print da conversa", "origem": "WhatsApp",
+    "destaque": True, "upload_ids": [up]})
+assert r.status_code == 201, r.get_data(as_text=True)
+ev = r.get_json()["evidence"]
+assert ev["important"] and ev["files"][0]["sha256"] == hashlib.sha256(foto).hexdigest()
+assert ev["occurred_at"] == "2025-11-10T08:15:00"
+r = api.get(ev["files"][0]["url"], headers=A); assert r.data == foto; r.close()
+assert api.get(ev["files"][0]["url"]).status_code == 401
+assert api.post(f"/api/v1/processos/{papp}/provas", headers=A, json={"data": "x", "titulo": "y"}).status_code == 400
+r = api.patch(f"/api/v1/processos/{papp}/provas/{ev['id']}", json={"titulo": "Print editado", "destaque": False},
+              headers=A)
+assert r.get_json()["evidence"]["title"] == "Print editado" and not r.get_json()["evidence"]["important"]
+det = api.get(f"/api/v1/processos/{papp}", headers=A).get_json()
+assert det["evidences"][0]["title"] == "Print editado"
+# outro cliente não enxerga
+assert anon2.get(f"/api/v1/processos/{papp}").status_code == 401
+link = api.post(f"/api/v1/processos/{papp}/link", json={}, headers=A).get_json()["url"]
+assert "/p/" in link and ok(app.test_client().get(link.split("localhost", 1)[-1]))
+# verificar pelo app
+r = api.post("/uploads/iniciar", json={"name": "copia.jpg", "size": len(foto), "purpose": "verificar"}, headers=A)
+vu = r.get_json()["id"]
+api.post(f"/uploads/{vu}/parte?offset=0", data=foto, headers=A, content_type="application/octet-stream")
+v = api.post("/api/v1/verificar", json={"upload_id": vu}, headers=A).get_json()
+assert v["matches"] and v["matches"][0]["evidence_id"] == ev["id"]
+assert api.delete(f"/api/v1/processos/{papp}/provas/{ev['id']}", headers=A).get_json()["ok"]
+assert api.get(f"/api/v1/processos/{papp}", headers=A).get_json()["evidences"] == []
+# Free respeita o limite de processos
+r = api.post("/api/v1/login", json={"email": "joao@ex.com", "senha": "segredo-123"})
+JT = {"Authorization": "Bearer " + r.get_json()["token"]}
+assert api.post("/api/v1/processos", json={"titulo": "1"}, headers=JT).status_code == 201
+r = api.post("/api/v1/processos", json={"titulo": "2"}, headers=JT)
+assert r.status_code == 403 and r.get_json()["code"] == "limite_processos"
+assert api.post("/api/v1/processos/1/link", json={}, headers=JT).status_code == 404
+# sair revoga o token
+assert api.delete("/api/v1/sessao", headers=JT).get_json()["ok"]
+assert api.get("/api/v1/me", headers=JT).status_code == 401
+# trocar a senha derruba o app
+ok(ana.post("/conta", data={"csrf": ca, "atual": "senha-ana-123", "nova": "senha-ana-456", "confirma": "senha-ana-456"}), 302)
+assert api.get("/api/v1/me", headers=A).status_code == 401
+# exclusão de conta pelo app (com senha) e pelo site
+r = adm.post("/admin/clientes/novo", data={"csrf": tok, "nome": "Para Excluir", "email": "x1@ex.com",
+                                           "senha": "senha-x1-123", "plano": "free", "ativo": "1"})
+tx = conn.execute("SELECT id FROM tenants WHERE name='Para Excluir'").fetchone()[0]
+XT = {"Authorization": "Bearer " + api.post("/api/v1/login", json={"email": "x1@ex.com", "senha": "senha-x1-123"}).get_json()["token"]}
+assert api.post("/api/v1/conta/excluir", json={"senha": "errada"}, headers=XT).status_code == 403
+assert api.post("/api/v1/conta/excluir", json={"senha": "senha-x1-123"}, headers=XT).get_json()["ok"]
+assert conn.execute("SELECT COUNT(*) FROM tenants WHERE id=?", (tx,)).fetchone()[0] == 0
+assert conn.execute("SELECT COUNT(*) FROM users WHERE email='x1@ex.com'").fetchone()[0] == 0
+assert conn.execute("SELECT COUNT(*) FROM audit WHERE action='excluir_propria_conta' AND tenant_id=?", (tx,)).fetchone()[0] == 1
+r = adm.post("/admin/clientes/novo", data={"csrf": tok, "nome": "Web Excluir", "email": "x2@ex.com",
+                                           "senha": "senha-x2-123", "plano": "free", "ativo": "1"})
+cx = app.test_client(); login(cx, "x2@ex.com", "senha-x2-123"); cxt = csrf(cx)
+assert "Excluir minha conta" in ok(cx.get("/conta"))
+assert "Digite EXCLUIR" in ok(cx.post("/conta/excluir", data={"csrf": cxt, "senha": "senha-x2-123", "confirmar": "nao"},
+                                      follow_redirects=True))
+assert "foram excluídos" in ok(cx.post("/conta/excluir", data={"csrf": cxt, "senha": "senha-x2-123", "confirmar": "excluir"},
+                                       follow_redirects=True))
+assert conn.execute("SELECT COUNT(*) FROM users WHERE email='x2@ex.com'").fetchone()[0] == 0
+print("api do app ok")
+
+
 
 # trocar senha do admin
 ok(adm.post("/conta", data={"csrf": tok, "atual": "senha-admin-123", "nova": "nova-senha-1", "confirma": "nova-senha-1"}), 302)

@@ -19,7 +19,7 @@
     <label>Confirmar senha <span class="password"><input type="password" name="confirma" required minlength="8" autocomplete="new-password"></span></label>
     <label class="honeypot" aria-hidden="true">Site <input type="text" name="site" tabindex="-1" autocomplete="off"></label>
     <label class="check small"><input type="checkbox" name="termos" value="1" required>
-      <span>Entendo que sou responsável pelos arquivos que envio e que o Íntegra organiza e preserva provas, mas não garante sua aceitação em juízo nem substitui orientação jurídica.</span></label>
+      <span>Li e aceito os <a href="{{ url_for('terms') }}" target="_blank">termos de uso</a> e a <a href="{{ url_for('privacy') }}" target="_blank">política de privacidade</a>. Entendo que sou responsável pelos arquivos que envio e que o Íntegra não garante sua aceitação em juízo nem substitui orientação jurídica.</span></label>
     <button type="submit" class="btn btn-primary btn-block">Criar minha conta</button>
     <p class="auth-links">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
   </form>

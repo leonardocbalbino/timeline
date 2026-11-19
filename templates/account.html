@@ -14,5 +14,11 @@
   <label>Confirmar nova senha <span class="password"><input type="password" name="confirma" required minlength="8" autocomplete="new-password"></span></label>
   <div class="form-actions"><button class="btn btn-primary">Alterar senha</button><a class="btn btn-ghost" href="{{ url_for('index') }}">Cancelar</a></div>
 </form>
+{% if g.user.role == 'cliente' %}
+<div class="row" style="justify-content:space-between;margin-top:var(--s-5)">
+  <span class="subtle small"><a href="{{ url_for('privacy') }}">Privacidade</a> · <a href="{{ url_for('terms') }}">Termos</a></span>
+  <a class="btn btn-ghost btn-sm" style="color:var(--danger)" href="{{ url_for('account_delete') }}">{{ icon('trash', 16) }}Excluir minha conta</a>
+</div>
+{% endif %}
 </div>
 {% endblock %}

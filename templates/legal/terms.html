@@ -1,0 +1,48 @@
+{% extends "legal/_layout.html" %}
+{% block title %}Termos de uso{% endblock %}
+{% block legal %}
+<span class="eyebrow">Íntegra</span>
+<h1 style="margin:var(--s-3) 0 var(--s-6)">Termos de uso</h1>
+<div class="legal-text">
+<p>Estes termos regem o uso do Íntegra (site <strong>processointegra.com.br</strong> e aplicativos), oferecido por {% if empresa_nome %}<strong>{{ empresa_nome }}</strong>{% if empresa_doc %} ({{ empresa_doc }}){% endif %}{% else %}seu responsável{% endif %}. Ao criar uma conta, você concorda com eles e com a <a href="{{ url_for('privacy') }}">política de privacidade</a>.</p>
+
+<h2>1. O que o Íntegra faz</h2>
+<p>O Íntegra organiza arquivos (prints, áudios, vídeos e documentos) em uma linha do tempo por processo, registra o código SHA-256 de cada arquivo no momento do envio e gera relatórios, pacotes de exportação e links somente leitura.</p>
+<p><strong>O Íntegra não presta assessoria jurídica</strong> e não garante que qualquer prova será aceita por um juízo, tribunal ou autoridade. O hash demonstra que o arquivo não foi alterado depois do envio ao sistema; ele não atesta a autenticidade do conteúdo, a data em que o fato ocorreu nem a forma como o arquivo foi obtido. Converse com um advogado sobre a sua estratégia.</p>
+
+<h2>2. Sua conta</h2>
+<ul>
+  <li>Você deve ter 18 anos ou mais e informar dados verdadeiros.</li>
+  <li>Você é responsável por manter sua senha em sigilo e por tudo o que for feito com o seu acesso, inclusive pelos links que você compartilhar.</li>
+  <li>Você pode excluir sua conta a qualquer momento, pelo site ou pelo app.</li>
+</ul>
+
+<h2>3. Conteúdo que você envia</h2>
+<ul>
+  <li>O conteúdo é seu. Você nos autoriza apenas a guardá-lo, processá-lo e exibi-lo para prestar o serviço.</li>
+  <li>Você declara ter obtido as provas de forma lícita e ter base legal para tratar os dados pessoais de terceiros que elas contenham.</li>
+  <li>É proibido enviar conteúdo ilícito, como material de abuso sexual infantil, conteúdo obtido por invasão de dispositivos ou interceptação ilegal, ou que viole direitos de terceiros. Contas nessa situação podem ser suspensas e o conteúdo preservado e entregue às autoridades quando a lei exigir.</li>
+</ul>
+
+<h2>4. Planos e pagamentos</h2>
+<ul>
+  <li>O plano <strong>Free</strong> é gratuito, com os limites informados na página de preços. O plano <strong>Pro</strong> é pago por período, via Pix, boleto ou cartão, com cobrança processada pelo Asaas.</li>
+  <li>Na <strong>assinatura</strong>, a cobrança se repete a cada período até você cancelar; o cancelamento vale para as próximas cobranças e o Pro continua até o fim do período já pago. No <strong>pagamento único</strong>, não há renovação automática.</li>
+  <li>Você pode desistir de uma contratação feita pela internet em até 7 dias (art. 49 do Código de Defesa do Consumidor), com devolução do valor pago.</li>
+  <li>Se o Pro vencer, a conta volta ao Free sem perda de dados; você apenas fica sujeito aos limites do Free até renovar.</li>
+  <li>Assinaturas do Pro são contratadas somente pelo site, não pelos aplicativos.</li>
+</ul>
+
+<h2>5. Disponibilidade e responsabilidade</h2>
+<ul>
+  <li>Buscamos manter o serviço disponível e seguro, mas podem ocorrer interrupções para manutenção ou por falhas de terceiros. Recomendamos manter os arquivos originais e baixar periodicamente o pacote ZIP dos processos importantes.</li>
+  <li>Na extensão permitida pela lei, não respondemos por decisões judiciais, por prejuízos decorrentes do conteúdo enviado por você ou por perda de prazos processuais.</li>
+</ul>
+
+<h2>6. Suspensão e encerramento</h2>
+<p>Podemos suspender contas que violem estes termos, com aviso quando possível. Você pode encerrar a conta a qualquer momento; veja <a href="{{ url_for('account_delete_info') }}">como excluir sua conta</a>.</p>
+
+<h2>7. Alterações e lei aplicável</h2>
+<p>Podemos alterar estes termos, avisando com antecedência mudanças relevantes. Aplica-se a lei brasileira, e fica eleito o foro do domicílio do consumidor.</p>
+</div>
+{% endblock %}

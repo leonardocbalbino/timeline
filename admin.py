@@ -166,24 +166,14 @@ def admin_client_delete(tid):
     if request.form.get("confirmar", "").strip() != t["name"]:
         flash("Para excluir, digite o nome do cliente exatamente como aparece.", "erro")
         return redirect(url_for("admin_client", tid=tid))
-    for sub in db().execute("SELECT * FROM subscriptions WHERE tenant_id=? AND status='ativa'", (tid,)).fetchall():
-        try:
-            billing.cancel_subscription(sub, g.user["email"])
-        except billing.BillingError as e:
-            flash(f"Não excluí o cliente: a assinatura no Asaas não foi cancelada ({e}).", "erro")
-            return redirect(url_for("admin_client", tid=tid))
-    stored = [r[0] for r in db().execute(
-        "SELECT f.stored_name FROM files f JOIN evidences e ON e.id = f.evidence_id "
-        "JOIN processes p ON p.id = e.process_id WHERE p.tenant_id=?", (tid,))]
-    stored += [r[0] for r in db().execute(
-        "SELECT receipt_stored FROM payments WHERE tenant_id=? AND receipt_stored IS NOT NULL", (tid,))]
-    db().execute("DELETE FROM tenants WHERE id=?", (tid,))
-    db().commit()
-    for s in stored:
-        unlink_upload(s)
+    try:
+        n = billing.delete_tenant(tid, g.user["email"])
+    except billing.BillingError as e:
+        flash(f"Não excluí o cliente: a assinatura no Asaas não foi cancelada ({e}).", "erro")
+        return redirect(url_for("admin_client", tid=tid))
     if session.get("as_tenant") == tid:
         session.pop("as_tenant")
-    audit("admin_excluir_cliente", f"#{tid} {t['name']} | {len(stored)} arquivo(s) apagado(s)", tenant_id=tid)
+    audit("admin_excluir_cliente", f"#{tid} {t['name']} | {n} arquivo(s) apagado(s)", tenant_id=tid)
     flash("Cliente e todos os seus dados foram excluídos.", "ok")
     return redirect(url_for("admin_home"))
 
@@ -206,7 +196,7 @@ def admin_plans():
                 "max_storage_mb": num("max_storage_mb"),
             }
         set_setting("planos", json.dumps(cfg))
-        for key in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias"):
+        for key in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias", "empresa_nome", "empresa_doc"):
             set_setting(key, request.form.get(key, "").strip())
         set_setting("autocadastro", "1" if request.form.get("autocadastro") else "0")
         set_setting("gateway", "asaas" if request.form.get("gateway") == "asaas" else "manual")
@@ -218,7 +208,7 @@ def admin_plans():
         flash("Planos e pagamento salvos.", "ok")
         return redirect(url_for("admin_plans"))
     settings = {k: setting(k) for k in ("pix_chave", "pix_nome", "pix_cidade", "pro_preco", "pro_dias",
-                                        "autocadastro", "contato_email")}
+                                        "autocadastro", "contato_email", "empresa_nome", "empresa_doc")}
     settings["gateway"] = setting("gateway")
     hooks = [e for e in db().execute("SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 8")]
     return render_template("admin/plans.html", plans=plans(), s=settings, asaas_ok=asaas.configured(),

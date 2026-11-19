@@ -1,7 +1,18 @@
 {% extends "base.html" %}
 {% block fulltitle %}Íntegra · Provas em ordem, do fato ao processo{% endblock %}
 {% block meta %}<meta name="robots" content="index, follow">
-<meta name="description" content="Íntegra organiza prints, áudios, vídeos e documentos em uma linha do tempo por processo, com hash SHA-256 de cada arquivo, relatório em PDF e link para o advogado.">{% endblock %}
+<meta name="description" content="Íntegra organiza prints, áudios, vídeos e documentos em uma linha do tempo por processo, com hash SHA-256 de cada arquivo, relatório em PDF e link para o advogado.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Íntegra">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Íntegra · Provas em ordem, do fato ao processo">
+<meta property="og:description" content="Prints, áudios e vídeos do seu caso numa linha do tempo, com impressão digital SHA-256 de cada arquivo. Pronto para o advogado.">
+<meta property="og:url" content="{{ url_for('index', _external=True) }}">
+<meta property="og:image" content="{{ url_for('static', filename='img/og.png', _external=True) }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Íntegra: provas em ordem, do fato ao processo">
+<meta name="twitter:card" content="summary_large_image">{% endblock %}
 {% block bodyclass %}landing{% endblock %}
 {% block header %}
 <header class="lp-header">
@@ -171,7 +182,7 @@
   <div class="lp-container">
     <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
     <span>Organiza e preserva provas. Não substitui orientação jurídica.</span>
-    <span>© {{ now_year }} Íntegra{% if contato %} · <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %} · <a href="{{ url_for('login') }}">Entrar</a></span>
+    <span>© {{ now_year }} Íntegra{% if contato %} · <a href="mailto:{{ contato }}">{{ contato }}</a>{% endif %} · <a href="{{ url_for('privacy') }}">Privacidade</a> · <a href="{{ url_for('terms') }}">Termos</a> · <a href="{{ url_for('login') }}">Entrar</a></span>
   </div>
 </footer>
 {% endblock %}

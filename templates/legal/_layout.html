@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block meta %}<meta name="robots" content="index, follow">{% endblock %}
+{% block bodyclass %}landing{% endblock %}
+{% block header %}
+<header class="lp-header">
+  <div class="lp-container">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <div class="lp-header-actions"><a href="{{ url_for('login') }}" class="btn btn-dark">Entrar</a></div>
+  </div>
+</header>
+{% endblock %}
+{% block main %}
+<main class="lp-section legal">
+  <div class="lp-container" style="max-width:780px">
+    {% block legal %}{% endblock %}
+    <p class="subtle small" style="margin-top:var(--s-10)">Última atualização: {{ atualizado }}.
+      {% if contato %}Dúvidas: <a href="mailto:{{ contato }}">{{ contato }}</a>.{% endif %}</p>
+  </div>
+</main>
+<footer class="lp-footer">
+  <div class="lp-container">
+    <a class="logo" href="{{ url_for('index') }}"><img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt=""><span>íntegra</span></a>
+    <span><a href="{{ url_for('privacy') }}">Privacidade</a> · <a href="{{ url_for('terms') }}">Termos</a> · <a href="{{ url_for('account_delete_info') }}">Excluir conta</a></span>
+  </div>
+</footer>
+{% endblock %}

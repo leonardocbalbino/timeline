@@ -70,7 +70,8 @@ DEFAULT_PLANS = {
 }
 DEFAULT_SETTINGS = {"pix_chave": "", "pix_nome": "", "pix_cidade": "",
                     "pro_preco": "49.90", "pro_dias": "30", "planos": "",
-                    "autocadastro": "1", "contato_email": "", "gateway": "manual"}
+                    "autocadastro": "1", "contato_email": "", "gateway": "manual",
+                    "empresa_nome": "", "empresa_doc": ""}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenants (
@@ -182,6 +183,15 @@ CREATE TABLE IF NOT EXISTS upload_sessions (
     mime TEXT NOT NULL DEFAULT '',
     size INTEGER NOT NULL,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,       -- sessões do app (Authorization: Bearer)
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,            -- SHA-256 do token; o token em si nunca é guardado
+    pwv TEXT NOT NULL,                          -- impressão da senha: trocar a senha derruba o app
+    device TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
 );
 CREATE TABLE IF NOT EXISTS webhook_events (
     id TEXT PRIMARY KEY,                        -- id do evento no Asaas (idempotência)
@@ -502,6 +512,11 @@ def password_fingerprint(user):
 def load_user():
     g.user = g.tenant = None
     g.impersonating = False
+    g.api_token = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        load_api_user(auth[7:].strip())
+        return
     uid = session.get("uid")
     if not uid or request.endpoint == "static":
         return
@@ -525,7 +540,30 @@ def load_user():
     g.user = u
 
 
-PUBLIC_PAGES = {"index", "signup", "static"}
+def token_hash(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def load_api_user(token):
+    """Autenticação do app: token Bearer de cliente ativo, invalidado se a senha mudar."""
+    if not token:
+        return
+    row = db().execute("SELECT * FROM api_tokens WHERE token_hash=?", (token_hash(token),)).fetchone()
+    if not row:
+        return
+    u = db().execute("SELECT * FROM users WHERE id=? AND active=1 AND role='cliente'", (row["user_id"],)).fetchone()
+    if not u or row["pwv"] != password_fingerprint(u):
+        return
+    t = db().execute("SELECT * FROM tenants WHERE id=?", (u["tenant_id"],)).fetchone()
+    if not t or not t["active"]:
+        return
+    g.user, g.tenant, g.api_token = u, t, row["id"]
+    if not row["last_used_at"] or row["last_used_at"][:13] != now()[:13]:
+        db().execute("UPDATE api_tokens SET last_used_at=? WHERE id=?", (now(), row["id"]))
+        db().commit()
+
+
+PUBLIC_PAGES = {"index", "signup", "static", "privacy", "terms", "account_delete_info"}
 
 
 @app.after_request
@@ -544,7 +582,10 @@ def csrf_token():
 
 @app.before_request
 def check_csrf():
-    if request.method == "POST" and request.endpoint not in ("login", "asaas_webhook"):
+    # O app (token Bearer, sem cookie) e o webhook não usam CSRF; a API recusa quem não tem token.
+    if g.get("api_token") or (request.endpoint or "").startswith("api_"):
+        return
+    if request.method in ("POST", "DELETE") and request.endpoint not in ("login", "asaas_webhook"):
         token = request.form.get("csrf") or request.headers.get("X-CSRF-Token")
         if not token or token != session.get("csrf"):
             abort(400, "Token de segurança inválido. Recarregue a página.")

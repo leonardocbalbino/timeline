@@ -38,6 +38,12 @@ if [ -f /etc/letsencrypt/live/processointegra.com.br/fullchain.pem ]; then
 else
   rm -f /etc/nginx/sites-enabled/timeline-dominio-ssl
 fi
+# Limpeza diária: cópias do banco com mais de 30 dias (política de privacidade)
+cat > /etc/cron.daily/integra-limpeza <<'CRON'
+#!/bin/sh
+find /opt/timeline/data/backups -name 'provas-*.db' -mtime +30 -delete 2>/dev/null
+CRON
+chmod 755 /etc/cron.daily/integra-limpeza
 systemctl daemon-reload
 systemctl enable --now timeline >/dev/null
 systemctl restart timeline

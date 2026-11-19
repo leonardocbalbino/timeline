@@ -72,9 +72,16 @@
     <h2>Página inicial e cadastro</h2>
     <label class="check"><input type="checkbox" name="autocadastro" value="1" {% if s.autocadastro == '1' %}checked{% endif %}>
       <span>Permitir que visitantes criem conta sozinhos <span class="hint">— entram no plano Free</span></span></label>
+    <div class="form-grid">
+      <label>Responsável (razão social ou nome) <span class="hint">aparece na política de privacidade e nos termos</span>
+        <input type="text" name="empresa_nome" value="{{ s.empresa_nome }}" maxlength="200"></label>
+      <label>CNPJ ou CPF do responsável <span class="hint">opcional</span>
+        <input type="text" name="empresa_doc" value="{{ s.empresa_doc }}" maxlength="30" style="font-family:var(--font-mono)"></label>
+    </div>
     <label>E-mail de contato exibido na página inicial <span class="hint">opcional</span>
       <input type="email" name="contato_email" value="{{ s.contato_email }}" placeholder="contato@seudominio.com.br"></label>
-    <p class="subtle small">Os preços e recursos da <a href="{{ url_for('index') }}" target="_blank" rel="noopener">página inicial</a> saem desta tela. Para ver como um visitante, abra numa janela anônima.</p>
+    <p class="subtle small">Os preços e recursos da <a href="{{ url_for('index') }}" target="_blank" rel="noopener">página inicial</a> saem desta tela. Para ver como um visitante, abra numa janela anônima.
+      Páginas públicas exigidas pelas lojas de apps: <a href="{{ url_for('privacy') }}" target="_blank">privacidade</a>, <a href="{{ url_for('terms') }}" target="_blank">termos</a> e <a href="{{ url_for('account_delete_info') }}" target="_blank">exclusão de conta</a>.</p>
   </section>
 
   <div class="form-actions"><button class="btn btn-primary">{{ icon('check') }}Salvar</button></div>

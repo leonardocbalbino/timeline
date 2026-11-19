@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Excluir conta{% endblock %}
+{% block content %}
+<div class="page-narrow" style="max-width:560px">
+<nav class="breadcrumb" aria-label="Você está em"><a href="{{ url_for('account') }}">Minha conta</a><span>/</span><span>Excluir conta</span></nav>
+<form method="post" class="card card-lg stack-lg danger-zone">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <div>
+    <h1>Excluir minha conta</h1>
+    <p class="muted" style="margin-top:8px">Isto apaga <strong>definitivamente</strong> a conta <strong>{{ g.tenant.name }}</strong>:
+      {{ nproc }} processo{{ 's' if nproc != 1 }}, todas as provas e todos os arquivos (<span class="mono">{{ used|human_size }}</span>),
+      o histórico de pagamentos e o acesso pelo app. Links de compartilhamento param de funcionar. Não tem como desfazer.</p>
+  </div>
+  {% if sub %}
+  <div class="alert alert-warning" style="margin:0">{{ icon('info') }}<span>Sua assinatura do Pro será cancelada junto, sem novas cobranças.</span></div>
+  {% endif %}
+  <div class="alert" style="margin:0">{{ icon('download') }}<span>Antes de excluir, baixe o pacote ZIP de cada processo se quiser guardar as provas e os hashes.</span></div>
+  <label>Sua senha <span class="password"><input type="password" name="senha" required autocomplete="current-password"></span></label>
+  <label>Digite <code>EXCLUIR</code> para confirmar <input type="text" name="confirmar" required autocomplete="off" autocapitalize="characters"></label>
+  <div class="form-actions">
+    <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
+    <a class="btn btn-ghost" href="{{ url_for('account') }}">Cancelar</a>
+  </div>
+</form>
+</div>
+{% endblock %}

@@ -75,6 +75,54 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/conta/excluir", methods=["GET", "POST"])
+@login_required
+def account_delete():
+    """Exclusão da própria conta (exigência da App Store e do Google Play)."""
+    if g.user["role"] != "cliente" or not g.tenant:
+        flash("A exclusão de conta é feita pelo próprio cliente.", "erro")
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        if not check_password_hash(g.user["password_hash"], request.form.get("senha", "")):
+            flash("Senha incorreta.", "erro")
+        elif request.form.get("confirmar", "").strip().upper() != "EXCLUIR":
+            flash("Digite EXCLUIR para confirmar.", "erro")
+        else:
+            tid, name, email = g.tenant["id"], g.tenant["name"], g.user["email"]
+            try:
+                n = billing.delete_tenant(tid, email)
+            except billing.BillingError as e:
+                flash(f"Não foi possível cancelar a assinatura agora ({e}). Tente de novo mais tarde.", "erro")
+                return redirect(url_for("account_delete"))
+            g.tenant = None
+            audit("excluir_propria_conta", f"#{tid} {name} {email} | {n} arquivo(s) apagado(s)", tenant_id=tid)
+            session.clear()
+            flash("Sua conta e todos os dados foram excluídos.", "ok")
+            return redirect(url_for("index"))
+    return render_template("account_delete.html", nproc=process_count(g.tenant["id"]),
+                           used=storage_used(g.tenant["id"]), sub=billing.active_subscription(g.tenant["id"]))
+
+
+def legal_context():
+    return {"empresa_nome": setting("empresa_nome"), "empresa_doc": setting("empresa_doc"),
+            "contato": setting("contato_email"), "atualizado": "19/11/2026"}
+
+
+@app.route("/privacidade")
+def privacy():
+    return render_template("legal/privacy.html", **legal_context())
+
+
+@app.route("/termos")
+def terms():
+    return render_template("legal/terms.html", **legal_context())
+
+
+@app.route("/excluir-conta")
+def account_delete_info():
+    return render_template("legal/delete_info.html", **legal_context())
+
+
 # ---------------------------------------------------------------- página inicial e autocadastro
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _signups = {}
@@ -867,6 +915,7 @@ def too_large(_e):
 
 
 import admin  # noqa: E402,F401  (registra as rotas do painel do administrador)
+import api  # noqa: E402,F401  (API do app)
 
 init_db()
 

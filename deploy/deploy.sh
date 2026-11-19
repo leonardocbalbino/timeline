@@ -16,6 +16,8 @@ src.backup(dst)
 dst.close(); src.close()
 PY
   ls -1t data/backups/provas-*.db | tail -n +16 | xargs -r rm -f
+  # nunca guarda cópia com mais de 30 dias (prazo prometido na política de privacidade)
+  find data/backups -name 'provas-*.db' -mtime +30 -delete
 fi
 
 git fetch -q origin main
