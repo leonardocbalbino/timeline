@@ -1,0 +1,100 @@
+{
+  "expo": {
+    "name": "Íntegra",
+    "slug": "integra",
+    "scheme": "integra",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F5F6F8",
+    "extra": {
+      "apiUrl": "https://processointegra.com.br"
+    },
+    "ios": {
+      "bundleIdentifier": "br.com.processointegra.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "br.com.processointegra.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E1A2B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#0E1A2B"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Íntegra acessa suas fotos e vídeos só quando você escolhe uma prova para enviar.",
+          "cameraPermission": "O Íntegra usa a câmera para fotografar ou filmar uma prova.",
+          "microphonePermission": "O Íntegra usa o microfone para gravar o áudio de vídeos que você filma como prova."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O Íntegra usa o microfone para gravar um áudio como prova, só quando você toca em gravar."
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 20,
+            "NSExtensionActivationSupportsMovieWithMaxCount": 10,
+            "NSExtensionActivationSupportsFileWithMaxCount": 20
+          },
+          "androidIntentFilters": [
+            "image/*",
+            "video/*",
+            "audio/*",
+            "application/pdf"
+          ],
+          "androidMultiIntentFilters": [
+            "image/*",
+            "video/*",
+            "audio/*",
+            "application/pdf"
+          ]
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
