@@ -16,7 +16,7 @@
   {% endif %}
   <div class="alert" style="margin:0">{{ icon('download') }}<span>Antes de excluir, baixe o pacote ZIP de cada processo se quiser guardar as provas e os hashes.</span></div>
   <label>Sua senha <span class="password"><input type="password" name="senha" required autocomplete="current-password"></span></label>
-  <label>Digite <code>EXCLUIR</code> para confirmar <input type="text" name="confirmar" required autocomplete="off" autocapitalize="characters"></label>
+  <label><span>Digite <code>EXCLUIR</code> para confirmar</span> <input type="text" name="confirmar" required autocomplete="off" autocapitalize="characters"></label>
   <div class="form-actions">
     <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
     <a class="btn btn-ghost" href="{{ url_for('account') }}">Cancelar</a>

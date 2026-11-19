@@ -142,7 +142,7 @@
   <p class="muted">Apaga o cliente, o login, todos os processos, provas e arquivos. Não tem como desfazer. Para só bloquear o acesso, desmarque “Conta ativa”.</p>
   <form method="post" action="{{ url_for('admin_client_delete', tid=t.id) }}">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <label>Digite <code>{{ t.name }}</code> para confirmar <input type="text" name="confirmar" required autocomplete="off"></label>
+    <label><span>Digite <code>{{ t.name }}</code> para confirmar</span> <input type="text" name="confirmar" required autocomplete="off"></label>
     <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
   </form>
 </section>

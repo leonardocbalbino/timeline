@@ -51,7 +51,7 @@
   <p class="muted">Apaga o processo, todas as provas e todos os arquivos dele. Não tem como desfazer.</p>
   <form method="post" action="{{ url_for('process_delete', pid=p.id) }}">
     <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-    <label>Digite <code>{{ p.title }}</code> para confirmar <input type="text" name="confirmar" required autocomplete="off"></label>
+    <label><span>Digite <code>{{ p.title }}</code> para confirmar</span> <input type="text" name="confirmar" required autocomplete="off"></label>
     <button class="btn btn-danger">{{ icon('trash', 16) }}Excluir definitivamente</button>
   </form>
 </section>
