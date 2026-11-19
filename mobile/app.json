@@ -9,7 +9,32 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#F5F6F8",
     "extra": {
-      "apiUrl": "https://processointegra.com.br"
+      "apiUrl": "https://processointegra.com.br",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ShareExtension",
+                  "bundleIdentifier": "br.com.processointegra.app.share-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.br.com.processointegra.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "d486c898-3136-4fbb-bab7-812f6d04e214"
+      }
     },
     "ios": {
       "bundleIdentifier": "br.com.processointegra.app",
@@ -34,6 +59,12 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "plugins": [
@@ -95,6 +126,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "leonardocbalbino"
   }
 }

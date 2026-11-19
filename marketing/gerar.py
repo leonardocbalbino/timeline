@@ -274,6 +274,217 @@ def st3():
   </div>""")
 
 
+# ------------------------------------------------------------ divulgação do site + app
+# Troque para True quando o app estiver publicado nas lojas e gere de novo.
+APP_NAS_LOJAS = False
+APP_LINHA = "Baixe para Android e iPhone" if APP_NAS_LOJAS else "App para Android e iPhone em breve"
+
+DEVICE_CSS = """
+.phone { background:#0B1422; border-radius:62px; padding:15px; box-shadow:0 50px 90px -40px rgba(14,26,43,.55); flex:none; }
+.phone-screen { background:var(--bg); color:var(--ink); border-radius:48px; overflow:hidden; display:flex; flex-direction:column; }
+.phone-status { display:flex; justify-content:space-between; padding:22px 34px 8px; font:600 20px 'Public Sans'; }
+.phone-status i { width:120px; height:30px; background:#0B1422; border-radius:20px; }
+.phone-bar { display:flex; align-items:center; justify-content:space-between; padding:14px 26px 16px; background:#fff;
+  border-bottom:2px solid var(--border); }
+.phone-bar .logo { font-size:26px; gap:10px; } .phone-bar .logo svg { width:34px; height:34px; }
+.phone-bar .ic { display:flex; gap:18px; color:var(--ink); }
+.phone-body { padding:22px 20px; display:grid; gap:16px; align-content:start; flex:1; }
+.phone-title { font:700 30px/1.15 'Schibsted Grotesk'; letter-spacing:-.02em; }
+.phone-meta { font:400 18px 'Public Sans'; color:var(--subtle); }
+.fab { margin:0 20px 26px; background:var(--action); color:#fff; border-radius:16px; text-align:center; padding:20px; font:600 22px 'Public Sans'; }
+.laptop { flex:none; }
+.laptop-screen { background:#fff; border:14px solid #0B1422; border-bottom-width:18px; border-radius:22px 22px 0 0; overflow:hidden; }
+.laptop-base { height:22px; background:linear-gradient(#C9D1DC,#AEB8C6); border-radius:0 0 18px 18px; margin:0 -40px; }
+.browser { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--s2); border-bottom:2px solid var(--border); }
+.browser b { width:12px; height:12px; border-radius:50%; background:#C9D1DC; }
+.browser .url { flex:1; background:#fff; border-radius:999px; padding:6px 16px; font:400 15px 'IBM Plex Mono'; color:var(--muted); }
+.web-head { display:flex; align-items:center; gap:22px; padding:14px 22px; border-bottom:2px solid var(--border); font:500 15px 'Public Sans'; color:var(--muted); }
+.web-head .logo { font-size:20px; gap:8px; } .web-head .logo svg { width:26px; height:26px; }
+.web-head .act { background:var(--s2); color:var(--ink); padding:5px 10px; border-radius:8px; font-weight:600; }
+.web-body { display:grid; grid-template-columns:150px 1fr; gap:22px; padding:20px 22px; background:var(--bg); }
+.web-index { display:grid; gap:6px; align-content:start; font:400 14px 'Public Sans'; color:var(--muted); }
+.web-index .on { background:#fff; border:2px solid var(--border); border-radius:10px; padding:7px 10px; color:var(--ink); font-weight:600; }
+.web-index span { padding:7px 10px; }
+.sheet { background:#fff; border-radius:30px 30px 0 0; padding:26px 24px 34px; display:grid; gap:22px; box-shadow:0 -10px 40px rgba(14,26,43,.18); }
+.sheet-apps { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; text-align:center; font:500 17px 'Public Sans'; color:var(--muted); }
+.sheet-apps i { display:block; width:76px; height:76px; border-radius:22px; background:var(--s2); margin:0 auto 10px; }
+.sheet-apps .me i { background:none; outline:5px solid var(--bright); outline-offset:4px; }
+.sheet-apps .me { color:var(--ink); font-weight:700; }
+.shot-chat { display:grid; gap:12px; padding:22px 20px; }
+.bubble { max-width:78%; padding:14px 18px; border-radius:20px; font:400 19px/1.35 'Public Sans'; background:#fff; border:2px solid var(--border); }
+.bubble.me { justify-self:end; background:#E7F6EC; border-color:#CDEBD6; }
+.bubble.media { padding:8px; } .bubble.media i { display:block; width:240px; height:150px; border-radius:14px; background:linear-gradient(180deg,#DCE3EC,#C9D1DC); }
+.arrow { font:700 64px 'Schibsted Grotesk'; color:var(--bright); }
+.stores { display:inline-flex; align-items:center; gap:14px; font:600 26px 'Public Sans'; }
+.stores .tag { font:500 18px 'IBM Plex Mono'; letter-spacing:.06em; text-transform:uppercase; padding:6px 12px; border-radius:999px;
+  background:var(--s2); color:var(--muted); }
+.dark .stores .tag { background:var(--ink2); color:var(--odm); }
+"""
+
+I_SHIELD = ('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
+            '<path d="m9 12 2 2 4-4"/>')
+I_USER = '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'
+I_PHONE = '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>'
+I_LAPTOP = '<path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>'
+I_CHECK = '<path d="M20 6 9 17l-5-5"/>'
+
+
+def page2(body, cls="light"):
+    return page(body, cls).replace("</style>", DEVICE_CSS + "</style>", 1)
+
+
+def phone(body, w=430, h=880, bar=True, fab=None, overlay=""):
+    head = (f'<div class="phone-bar">{logo()}<span class="ic">{icon(I_SHIELD, 26)}{icon(I_USER, 26)}</span></div>' if bar else "")
+    return (f'<div class="phone" style="width:{w}px"><div class="phone-screen" style="height:{h}px;position:relative">'
+            f'<div class="phone-status"><span>9:41</span><i></i><span>100%</span></div>{head}'
+            f'<div class="phone-body">{body}</div>{f"<div class=fab>{fab}</div>" if fab else ""}{overlay}</div></div>')
+
+
+def app_timeline():
+    return (f'<div><div class="phone-title">Ação trabalhista — Empresa X</div>'
+            f'<div class="phone-meta" style="margin-top:6px"><b style="color:var(--ink)">5</b> registros · 8 arquivos</div></div>'
+            f'<div style="zoom:.62">{timeline(compact=True)}</div>')
+
+
+def app_share_save():
+    files = "".join(f'<div style="display:flex;gap:10px;align-items:center;font-size:17px;color:var(--muted)">{icon(I_FILE, 20, "#5A6B82")}{n}</div>'
+                    for n in ("IMG-20250312-WA0014.jpg", "PTT-20250312-WA0021.opus", "IMG-20250312-WA0015.jpg"))
+    proc = lambda t, n: (f'<div class="card" style="padding:18px 20px;display:flex;justify-content:space-between;align-items:center">'
+                         f'<div><div style="font:600 21px \'Public Sans\'">{t}</div><div style="font-size:16px;color:var(--subtle)">{n}</div></div>'
+                         f'<span style="font:700 26px \'Schibsted Grotesk\';color:var(--subtle)">›</span></div>')
+    return (f'<div class="card" style="padding:18px 20px;display:grid;gap:10px">'
+            f'<div style="font:600 19px \'Public Sans\'">3 arquivos recebidos · 4,2 MB</div>{files}</div>'
+            f'<div class="phone-title" style="font-size:26px">Em qual processo salvar?</div>'
+            f'{proc("Ação trabalhista — Empresa X", "5 provas")}{proc("Condomínio — barulho", "2 provas")}')
+
+
+def chat_with_sheet():
+    chat = ('<div class="shot-chat"><div class="bubble">Te mando o print da conversa de ontem</div>'
+            '<div class="bubble media"><i></i></div><div class="bubble me">Recebi, obrigado!</div></div>')
+    sheet = (f'<div class="sheet" style="position:absolute;left:0;right:0;bottom:0">'
+             f'<div style="font:600 22px \'Public Sans\'">Compartilhar com</div>'
+             f'<div class="sheet-apps"><span><i></i>E-mail</span><span><i></i>Drive</span>'
+             f'<span class="me">{LOGO.format(bg="#0E1A2B").replace("<svg ", "<svg style=\"display:block;width:76px;height:76px;margin:0 auto 10px;border-radius:22px;outline:5px solid #2DD4BF;outline-offset:4px\" ")}Íntegra</span>'
+             f'<span><i></i>Mensagens</span></div></div>')
+    return phone(chat, bar=False, overlay=sheet)
+
+
+def laptop(w=900):
+    return (f'<div class="laptop" style="width:{w}px"><div class="laptop-screen">'
+            f'<div class="browser"><b></b><b></b><b></b><span class="url">🔒 {SITE}</span></div>'
+            f'<div class="web-head">{logo()}<span class="act">Processos</span><span>Verificar arquivo</span><span>Plano</span></div>'
+            f'<div class="web-body"><div class="web-index"><span style="font:500 12px \'IBM Plex Mono\';letter-spacing:.08em">DATAS</span>'
+            f'<span class="on">ter, 12 mar · 3</span><span>qua, 13 mar · 1</span><span>sex, 15 mar · 1</span></div>'
+            f'<div style="zoom:.6">{timeline()}</div></div></div><div class="laptop-base"></div></div>')
+
+
+def stores_line(dark=False):
+    return f'<div class="stores">{icon(I_PHONE, 30)}<span>{APP_LINHA}</span></div>'
+
+
+@piece("divulga-post-1", 1080, 1350)
+def dp1():
+    return page2(f"""
+<div style="padding:84px 84px 0;display:flex;flex-direction:column;gap:36px;height:100%">
+  <div class="foot">{logo()}<span class="pager">01/03</span></div>
+  <span class="eyebrow">No computador e no celular</span>
+  <h2>Suas provas em ordem, onde você estiver.</h2>
+  <p class="lead">Organize no site. Registre na hora pelo app. Tudo na mesma linha do tempo, com o hash de cada arquivo.</p>
+  <div style="position:relative;margin-top:auto;height:640px">
+    <div style="position:absolute;left:-10px;top:40px;zoom:.92">{laptop()}</div>
+    <div style="position:absolute;right:-20px;top:0;zoom:.78">{phone(app_timeline(), fab='+ Nova prova')}</div>
+  </div>
+</div>""")
+
+
+@piece("divulga-post-2", 1080, 1350)
+def dp2():
+    return page2(f"""
+<div style="padding:84px 84px 0;display:flex;flex-direction:column;gap:34px;height:100%">
+  <div class="foot">{logo(True)}<span class="pager">02/03</span></div>
+  <span class="eyebrow">Do WhatsApp para o processo</span>
+  <h2>Recebeu um print ou um áudio? Mande direto para o Íntegra.</h2>
+  <p class="lead">Toque em Compartilhar, escolha o Íntegra e o processo. A data sai do nome do arquivo e o hash é registrado no envio.</p>
+  <div style="display:flex;align-items:center;justify-content:center;gap:22px;margin-top:auto;margin-bottom:70px">
+    <div style="zoom:.58">{chat_with_sheet()}</div>
+    <div class="arrow">→</div>
+    <div style="zoom:.58">{phone(app_share_save(), bar=False)}</div>
+  </div>
+</div>""", "dark")
+
+
+@piece("divulga-post-3", 1080, 1350)
+def dp3():
+    item = lambda t: f'<div style="display:flex;gap:16px;align-items:center;font-size:30px">{icon(I_CHECK, 34, "#0F766E")}{t}</div>'
+    return page2(f"""
+<div style="padding:84px;display:grid;grid-template-columns:1fr 360px;grid-template-rows:auto 1fr;gap:40px 30px;height:100%">
+  <div class="foot" style="grid-column:1/-1">{logo()}<span class="pager">03/03</span></div>
+  <div style="display:flex;flex-direction:column;gap:34px">
+    <span class="eyebrow">Comece hoje</span>
+    <h2 style="font-size:70px">Grátis no site. No bolso com o app.</h2>
+    <div style="display:grid;gap:18px">{item('Linha do tempo por dia e hora')}{item('Hash SHA-256 de cada arquivo')}{item('Relatório e link para o advogado')}</div>
+    <div style="margin-top:auto;display:grid;gap:22px;justify-items:start">
+      <span class="btn" style="font-size:32px">Criar conta grátis</span>
+      <span class="mono" style="font-size:32px;color:var(--action)">{SITE}</span>
+      {stores_line()}
+      <span style="font-size:20px;color:var(--subtle)">Organiza e preserva provas. Não substitui orientação jurídica.</span>
+    </div>
+  </div>
+  <div style="zoom:.82;align-self:center">{phone(app_timeline(), fab='+ Nova prova')}</div>
+</div>""", "white")
+
+
+def story2(inner, cls="light"):
+    return page2(f"""
+<div style="padding:190px 84px 250px;display:flex;flex-direction:column;justify-content:center;gap:44px;height:100%">
+  {logo(cls == 'dark')}
+  {inner}
+</div>""", cls)
+
+
+@piece("divulga-story-1", 1080, 1920)
+def ds1():
+    return story2(f"""
+  <span class="eyebrow" style="font-size:26px">No computador e no celular</span>
+  <h1 style="font-size:96px">Suas provas em ordem, onde você estiver.</h1>
+  <div style="position:relative;height:760px;margin-top:10px">
+    <div style="position:absolute;left:-40px;top:60px;zoom:1">{laptop(880)}</div>
+    <div style="position:absolute;right:-30px;top:0;zoom:.86">{phone(app_timeline(), fab='+ Nova prova')}</div>
+  </div>""")
+
+
+@piece("divulga-story-2", 1080, 1920)
+def ds2():
+    return story2(f"""
+  <span class="eyebrow" style="font-size:26px">Do WhatsApp para o processo</span>
+  <h1 style="font-size:92px">Compartilhe direto para o Íntegra.</h1>
+  <p class="lead" style="font-size:34px">Print, áudio ou vídeo: escolha o processo e pronto. Data sugerida e hash registrado.</p>
+  <div style="display:flex;align-items:center;justify-content:center;gap:18px">
+    <div style="zoom:.8">{chat_with_sheet()}</div>
+    <div style="zoom:.8">{phone(app_share_save(), bar=False)}</div>
+  </div>""", "dark")
+
+
+@piece("divulga-story-3", 1080, 1920)
+def ds3():
+    return story2(f"""
+  <span class="eyebrow" style="font-size:26px">Comece grátis</span>
+  <h1 style="font-size:104px">Organize suas provas hoje.</h1>
+  <div style="display:flex;gap:40px;align-items:center">
+    <div style="zoom:.92">{phone(app_timeline(), fab='+ Nova prova')}</div>
+    <div style="display:grid;gap:26px">
+      <div style="display:flex;gap:14px;align-items:center;font-size:30px">{icon(I_LAPTOP, 40, '#0F766E')}No site, grátis</div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:30px">{icon(I_PHONE, 40, '#0F766E')}{'No Android e iPhone' if APP_NAS_LOJAS else 'App chegando'}</div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:30px">{icon(I_HASH, 40, '#0F766E')}Hash de cada arquivo</div>
+    </div>
+  </div>
+  <div style="display:grid;gap:16px;justify-items:center;text-align:center;margin-top:20px">
+    <span class="mono" style="font-size:42px;color:var(--action)">{SITE}</span>
+    {stores_line()}
+    <span style="font-size:22px;color:var(--subtle)">Não substitui orientação jurídica.</span>
+  </div>""")
+
+
 def main(only=None):
     os.makedirs(OUT, exist_ok=True)
     with sync_playwright() as pw:
